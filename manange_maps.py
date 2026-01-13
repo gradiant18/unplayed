@@ -39,7 +39,14 @@ def has_replay(challenge_file):
         print(f"Could not get map name from {challenge_file}")
         return None
 
-    replay_name = f"steamuser_{track_name}.Replay.gbx"
+    file_name = re.sub(r"\W+", "", track_name.replace(":", "_").strip())
+    replay_name = f"steamuser_{file_name}.Replay.gbx"
+
+    real_name = "steamuser_§TF§Left of the Moon§.Replay.gbx"
+    fake_name = f"{autosaves}/{replay_name}"
+    print(r'\x' + r'\x'.join(f'{b:02x}' for b in bytes(real_name, 'utf8')))
+    print(r'\x' + r'\x'.join(f'{b:02x}' for b in bytes(replay_name, 'utf8')))
+
     if os.path.exists(f"{autosaves}/{replay_name}"):
         return True
     else:
@@ -62,6 +69,7 @@ def scan_folder(path):
     
 autosaves = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Replays/Autosaves"
 maps = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Downloaded"
+finished = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Finished"
 
 # get list of files and directories
 files, dirs = scan_folder(maps)
@@ -76,12 +84,12 @@ for file in files:
 
     if has_replay(file):
         print(f"{track_id} has a replay but not uploaded")
-        os.remove(file)
+        os.rename(file, f"{finished}/{track_id}.Challenge.Gbx")
         continue
 
     if has_record(track_id):
         print(f"{track_id} has at least 1 record")
-        os.remove(file)
+        os.rename(file, f"{finished}/{track_id}.Challenge.Gbx")
         continue
 
     print(f"{track_id} does not have a replay")
