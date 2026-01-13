@@ -3,6 +3,7 @@ from pygbx import Gbx, GbxType
 import re
 import requests
 
+# get map name from challenge file
 def get_map_name(gbx_file):
     g = Gbx(gbx_file)
     challenge = g.get_class_by_id(GbxType.CHALLENGE)
@@ -10,6 +11,7 @@ def get_map_name(gbx_file):
         return None
     return challenge.map_name
 
+# get track id from downloaded challenge file
 def get_track_id(challenge):
     match = re.search(r"\/\d+\.", challenge)
     if match:
@@ -17,7 +19,8 @@ def get_track_id(challenge):
     else:
         return None
 
-def has_records(track_id):
+# find if track has a record uploaded
+def has_record(track_id):
     url = "https://tmnf.exchange/api/tracks"
     params = {"fields": "TrackName", "id": track_id, "inhasrecord": 1}
 
@@ -29,6 +32,7 @@ def has_records(track_id):
         print(f"Request Error: {e}")
         return False
 
+# find if autosave exists
 def has_replay(challenge_file):
     track_name = get_map_name(challenge_file)
     if not track_name:
@@ -41,6 +45,7 @@ def has_replay(challenge_file):
     else:
         return False
 
+# recursively make list of files and directories in path
 def scan_folder(path):
     files, dirs = [], []
     for entry in os.scandir(path):
@@ -58,17 +63,15 @@ def scan_folder(path):
 autosaves = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Replays/Autosaves"
 maps = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Downloaded"
 
+# get list of files and directories
 files, dirs = scan_folder(maps)
 
+# find replay for every track
 for file in files:
     track_id = get_track_id(file)
+
     if not track_id:
         print(f"Could not extract TrackId from {file}")
-        continue
-
-    if has_records(track_id):
-        print(f"{track_id} has at least 1 record")
-        os.remove(file)
         continue
 
     if has_replay(file):
@@ -76,3 +79,15 @@ for file in files:
         os.remove(file)
         continue
 
+    if has_record(track_id):
+        print(f"{track_id} has at least 1 record")
+        os.remove(file)
+        continue
+
+    print(f"{track_id} does not have a replay")
+
+# remove empty folders
+for folder in dirs[::-1]:
+    files, folders = scan_folder(folder)
+    if not files and not folders:
+        os.rmdir(folder)
