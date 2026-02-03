@@ -108,15 +108,7 @@ def scan_replays(path):
     return replays
 
 
-medals_collected = {"author": 0, "gold": 0, "silver": 0, "bronze": 0, "none": 0}
-unplayed = scan_tracks(unplayed_dir)
-current = scan_tracks(current_dir)
-for track in current:  # remove played maps from current
-    if has_record(track["path"]):
-        os.remove(track["path"])
-        current.pop(track)
-
-while True:
+def main(target=False):
     current = scan_tracks(current_dir)
     autosaves = scan_replays(autosaves_dir)
 
@@ -156,3 +148,43 @@ while True:
         print(f"Added {track["name"]} to current")
 
     sleep(0.5)
+    if target:
+        total = 0
+        for medal in medals_collected:
+            total += medals_collected[medal]
+        return total
+
+
+medals_collected = {"author": 0, "gold": 0, "silver": 0, "bronze": 0, "none": 0}
+unplayed = scan_tracks(unplayed_dir)
+current = scan_tracks(current_dir)
+for track in current:  # remove played maps from current
+    if has_record(track["path"]):
+        os.remove(track["path"])
+        current.pop(track)
+
+try:
+    mode = "free"
+    timer = 60
+    target = 2
+
+    match mode:
+        case "free":
+            while True:
+                main()
+        case "timed":
+            end_time = time() + (timer * 1000)
+            while time() < end_time:
+                main()
+        case "target":
+            while main(target=True) < target:
+                pass
+
+except KeyboardInterrupt:
+    total = 0
+    print()
+    for medal in medals_collected:
+        print(f"{medal} = {medals_collected[medal]}")
+        total += medals_collected[medal]
+
+    print(f"Total = {total}")
