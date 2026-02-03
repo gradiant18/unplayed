@@ -3,6 +3,20 @@ from pygbx import Gbx, GbxType
 import re
 import requests
 
+# remove 'bad' characters from filename
+def clean_filename(file_path):
+    if "Replay.gbx" in file_path:
+        directory, filename = os.path.split(file_path)
+        clean_name = re.sub(r"[^a-zA-Z0-9_\/\\[\]\$\(\)\.\ -]", "", filename)
+        clean_full_path = os.path.join(directory, clean_name)
+
+        if file_path != clean_full_path:
+            print(f"Renaming: {filename} -> {clean_filename}")
+            os.rename(file_path, clean_full_path)
+
+        return clean_full_path
+    return None
+
 # get map name from challenge file
 def get_map_name(gbx_file):
     g = Gbx(gbx_file)
@@ -39,13 +53,7 @@ def has_replay(challenge_file):
         print(f"Could not get map name from {challenge_file}")
         return None
 
-    file_name = re.sub(r"\W+", "", track_name.replace(":", "_").strip())
-    replay_name = f"steamuser_{file_name}.Replay.gbx"
-
-    real_name = "steamuser_§TF§Left of the Moon§.Replay.gbx"
-    fake_name = f"{autosaves}/{replay_name}"
-    print(r'\x' + r'\x'.join(f'{b:02x}' for b in bytes(real_name, 'utf8')))
-    print(r'\x' + r'\x'.join(f'{b:02x}' for b in bytes(replay_name, 'utf8')))
+    replay_name = clean_filename(track_name)
 
     if os.path.exists(f"{autosaves}/{replay_name}"):
         return True
@@ -70,6 +78,11 @@ def scan_folder(path):
 autosaves = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Replays/Autosaves"
 maps = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Downloaded"
 finished = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Finished"
+
+# clean autosave file names
+files, _ = scan_folder(autosaves)
+for file_path in files:
+    clean_filename(file_path)
 
 # get list of files and directories
 files, dirs = scan_folder(maps)
