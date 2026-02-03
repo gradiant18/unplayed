@@ -163,9 +163,10 @@ for track in current:  # remove played maps from current
         os.remove(track["path"])
         current.pop(track)
 
+# TODO: print summary at the end
 try:
-    mode = "free"
-    timer = 60
+    mode = "timed"
+    timer = 120
     target = 2
 
     match mode:
@@ -173,11 +174,12 @@ try:
             while True:
                 main()
         case "timed":
-            end_time = time() + (timer * 1000)
+            end_time = time() + (timer * 1)
             while time() < end_time:
                 main()
+                print(f"Time Remaining: {end_time - time():.2f}s", end="\r")
         case "target":
-            while main(target=True) < target:
+            while main(target=True) < target - 1:
                 pass
 
 except KeyboardInterrupt:
