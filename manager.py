@@ -4,7 +4,6 @@ import random
 import re
 import requests
 from time import sleep, time
-from tqdm import tqdm
 
 finished_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Finished"
 current_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Current"
@@ -14,12 +13,11 @@ autosaves_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/
 
 def clean_autosave(path):
     directory, filename = os.path.split(path)
-    clean_name = re.sub(r"[^a-zA-Z0-9_\\[\]\$\(\)\.\ -]", "", filename)
-    clean_path = os.path.join(directory, clean_name)
+    clean_name = re.sub(r"[^a-zA-Z0-9\\[\]\$\(\)\.\ -_]", "", filename)
+    clean_name = re.sub(r"^steamuser_", "", clean_name)
+    clean_name = re.sub(r"\.Replay\.gbx$", "", clean_name)
 
-    if path != clean_path:
-        os.rename(path, clean_path)
-    return clean_path
+    return clean_name
 
 
 def get_medal(autosave, track_id):
@@ -59,8 +57,7 @@ def get_track_name(path):
     if not challenge:
         return None
 
-    clean_name = re.sub(r"\/", "_", challenge.map_name)
-    clean_name = re.sub(r"[^a-zA-Z0-9_\\[\]\$\(\)\.\ -]", "", clean_name)
+    clean_name = re.sub(r"[^a-zA-Z0-9\"\'\/\\[\]\$\(\)\.\ -_]", "", challenge.map_name)
     g.f.close()
     return clean_name
 
@@ -102,9 +99,9 @@ def scan_replays(path):
     for entry in os.scandir(path):
         if not entry.is_file():
             continue
-        entry = clean_autosave(entry.path)
+        clean_name = clean_autosave(entry.path)
         _, filename = os.path.split(entry)
-        replays.append({"path": entry, "name": filename})
+        replays.append({"path": entry, "name": clean_name})
     return replays
 
 
@@ -114,7 +111,7 @@ def main(target=False):
 
     for track in current:
         for autosave in autosaves:
-            if autosave["name"] == f"steamuser_{track["name"]}.Replay.gbx":
+            if autosave["name"] == track["name"]:
                 print(f'{track["name"]} is finished')
 
                 # get medal type
@@ -148,11 +145,10 @@ def main(target=False):
         print(f"Added {track["name"]} to current")
 
     sleep(0.5)
-    if target:
-        total = 0
-        for medal in medals_collected:
-            total += medals_collected[medal]
-        return total
+    total = 0
+    for medal in medals_collected:
+        total += medals_collected[medal]
+    return total
 
 
 medals_collected = {"author": 0, "gold": 0, "silver": 0, "bronze": 0, "none": 0}
@@ -165,19 +161,23 @@ for track in current:  # remove played maps from current
 
 # TODO: print summary at the end
 try:
-    mode = "timed"
-    timer = 120
+    mode = "free"
+    timer = 7 * 60
     target = 2
 
     match mode:
         case "free":
             while True:
-                main()
+                tracks_done = main()
+                print(f"Maps Completed: {tracks_done}", end="\r")
         case "timed":
             end_time = time() + (timer * 1)
             while time() < end_time:
-                main()
-                print(f"Time Remaining: {end_time - time():.2f}s", end="\r")
+                tracks_done = main()
+                print(
+                    f"Tracks Completed: {tracks_done}\tTime Remaining: {end_time - time():.2f}s",
+                    end="\r",
+                )
         case "target":
             while main(target=True) < target - 1:
                 pass
