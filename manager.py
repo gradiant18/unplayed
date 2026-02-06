@@ -15,8 +15,6 @@ class ErrorInterceptor(logging.Handler):
 
 logger = logging.getLogger()
 logger.addHandler(ErrorInterceptor())
-
-
 finished_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Finished"
 current_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Current"
 unplayed_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Unplayed"
@@ -56,19 +54,16 @@ def get_replay_track_name(path):
         g = Gbx(path)
         replay = g.get_class_by_id(GbxType.REPLAY_RECORD)
         if not replay.track:
-            print("not replay")
             g.f.close()
             raise RuntimeError
 
         challenge = replay.track.get_class_by_id(GbxType.CHALLENGE)
 
         if not challenge:
-            print("not challenge")
             return None
         g.f.close()
         return challenge.map_name
     except RuntimeError:
-        print("run time error\n\n\n\n\n\n\n\n")
         return get_replay_track_name_backup(path)
 
 
@@ -143,7 +138,6 @@ def main(medals_collected):
 
     for track in current:
         for autosave in autosaves:
-            print(autosave["name"], track["name"])
             if autosave["name"] == track["name"]:
                 print(f'{track["name"]} is finished')
 
