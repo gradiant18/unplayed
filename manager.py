@@ -1,6 +1,5 @@
 import os
 from pygbx import Gbx, GbxType
-import random
 import re
 import requests
 from time import sleep, time
@@ -53,7 +52,7 @@ def get_replay_track_name(path):
     try:
         g = Gbx(path)
         replay = g.get_class_by_id(GbxType.REPLAY_RECORD)
-        if not replay.track:
+        if not replay or not replay.track:
             g.f.close()
             raise RuntimeError
 
@@ -61,6 +60,7 @@ def get_replay_track_name(path):
 
         if not challenge:
             return None
+
         g.f.close()
         return challenge.map_name
     except RuntimeError:
@@ -68,12 +68,12 @@ def get_replay_track_name(path):
 
 
 def get_replay_track_name_backup(path):
-    directory, filename = os.path.split(path)
-    clean_name = re.sub(clean_string, "", filename)
-    clean_name = re.sub(r"^steamuser", "", clean_name)
-    clean_name = re.sub(r"\.Replay\.gbx$", "", clean_name)
+    _, filename = os.path.split(path)
+    track_name = re.sub(clean_string, "", filename)
+    track_name = re.sub(r"^steamuser", "", track_name)
+    track_name = re.sub(r"\.Replay\.gbx$", "", track_name)
 
-    return clean_name
+    return track_name
 
 
 def get_track_name(path):
@@ -86,6 +86,9 @@ def get_track_name(path):
         g.f.close()
         return challenge.map_name
     except RuntimeError:
+        return None
+    except AttributeError:
+        print(path)
         return None
 
 
@@ -127,7 +130,6 @@ def scan_replays(path):
         if not entry.is_file():
             continue
         name = get_replay_track_name(entry.path)
-        _, filename = os.path.split(entry)
         replays.append({"path": entry, "name": name})
     return replays
 
@@ -139,7 +141,7 @@ def main(medals_collected):
     for track in current:
         for autosave in autosaves:
             if autosave["name"] == track["name"]:
-                print(f'{track["name"]} is finished')
+                print(f"{track['name']} is finished")
 
                 # get medal type
                 medal = get_medal(autosave["path"].path, track["id"])
@@ -168,7 +170,7 @@ def main(medals_collected):
         # update current
         track["path"] = new_path
         current.append(track)
-        print(f"Added {track["name"]} to current")
+        print(f"Added {track['name']} to current")
 
     return medals_collected
 
@@ -183,6 +185,7 @@ for track in current:  # remove played maps from current
     if has_record(track["path"]):
         os.remove(track["path"])
         current.pop(track)
+
 
 match mode:
     case "free":
