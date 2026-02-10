@@ -24,8 +24,7 @@ class NewFileHandler(FileSystemEventHandler):
             self.queue.put(event.src_path)
 
 
-def add_to_current():
-    global current
+def add_to_current(unplayed, current):
     while len(current) < 2:
         track = unplayed.pop()
 
@@ -35,7 +34,7 @@ def add_to_current():
             continue
 
         # move track into current list
-        _, file = os.path.split(track["path"])
+        file = os.path.split(track["path"])[1]
         new_path = os.path.join(current_dir, file)
         os.rename(track["path"], new_path)
 
@@ -44,6 +43,30 @@ def add_to_current():
         current.append(track)
         print(f"Added {track['name']} to current")
     return
+
+
+def find_finished(file_queue, current, medals_collected):
+    autosave = file_queue.get()
+    replay_name = get_replay_track_name(autosave)
+    current = scan_tracks(current_dir)
+    for track in current:
+        if track["name"] == replay_name:
+            print(f"{track['name']} is finished")
+
+            # get medal type
+            medal = get_medal(autosave, track["id"])
+            if medal:
+                medals_collected[medal] += 1
+            else:
+                medals_collected["none"] += 1
+            print(medals_collected)
+
+            # move track into finished directory
+            file = os.path.split(track["path"])[1]
+            new_path = os.path.join(finished_dir, file)
+            os.rename(track["path"], new_path)
+
+            current.remove(track)  # update current
 
 
 # TODO: combine with has_record to avoid multiple api calls
@@ -92,7 +115,7 @@ def get_replay_track_name(path):
 
 
 def get_replay_track_name_backup(path):
-    directory, filename = os.path.split(path)
+    filename = os.path.split(path)[1]
     track_name = re.sub(clean_string, "", filename)
     track_name = re.sub(r"^steamuser", "", track_name)
     track_name = re.sub(r"\.Replay\.gbx$", "", track_name)
@@ -136,6 +159,7 @@ def has_record(track_id):
         return False
 
 
+# use multiprocessing?
 def scan_tracks(path):
     tracks = []
     for entry in os.scandir(path):
@@ -148,6 +172,7 @@ def scan_tracks(path):
     return tracks
 
 
+# use multiprocessing?
 def scan_replays(path):
     replays = []
     for entry in os.scandir(path):
@@ -158,8 +183,7 @@ def scan_replays(path):
     return replays
 
 
-def app():
-    global unplayed, current
+def app(unplayed, current):
     file_queue = Queue()
     event_handler = NewFileHandler(file_queue)
     observer = Observer()
@@ -170,34 +194,8 @@ def app():
     try:
         while True:
             if not file_queue.empty():
-                start = time()
-                autosave = file_queue.get()
-                replay_name = get_replay_track_name(autosave)
-                current = scan_tracks(current_dir)
-                for track in current:
-                    if track["name"] == replay_name:
-                        print(f"{track['name']} is finished")
-
-                        # get medal type
-                        medal = get_medal(autosave, track["id"])
-                        if medal:
-                            medals_collected[medal] += 1
-                        else:
-                            medals_collected["none"] += 1
-                        print(medals_collected)
-
-                        # move track into finished directory
-                        _, file = os.path.split(track["path"])
-                        new_path = os.path.join(finished_dir, file)
-                        os.rename(track["path"], new_path)
-
-                        current.remove(track)  # update current
-                print(f"finding track took {time() - start}s")
-
-                start = time()
-                add_to_current()
-                print(f"adding new track took {time() - start}s")
-
+                find_finished(file_queue, current, medals_collected)
+                add_to_current(unplayed, current)
                 file_queue.task_done()
 
             sleep(0.1)
@@ -205,6 +203,7 @@ def app():
     except KeyboardInterrupt:
         observer.stop()
     observer.join()
+    return medals_collected
 
 
 logger = logging.getLogger()
@@ -222,8 +221,14 @@ if __name__ == "__main__":
 
     start = time()
     unplayed = scan_tracks(unplayed_dir)
+    print(f"scanning unplayed took {time() - start}s")
+    start = time()
     current = scan_tracks(current_dir)
+    print(f"scanning current took {time() - start}s")
+    start = time()
     autosaves = scan_replays(autosaves_dir)
+    print(f"scanning autosaves took {time() - start}s")
+    start = time()
     for track in current:  # remove played maps from current
         for autosave in autosaves:
             if autosave["name"] == track["name"]:
@@ -232,6 +237,7 @@ if __name__ == "__main__":
         if has_record(track["path"]):
             os.remove(track["path"])
             current.pop(track)
-    print(f"startup took {time() - start}s")
+    print(f"removal took {time() - start}s")
     print("starting app now")
-    app()
+    medals = app(unplayed, current)
+    print(medals)
