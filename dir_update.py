@@ -30,7 +30,7 @@ def add_to_next_queue():
     global next_queue, unplayed
     while next_queue.empty():
         track = unplayed.pop()
-        if has_autosave(track):
+        if has_autosave(get_track_name(track)):
             continue
         if has_record(get_track_id(track)):
             continue
@@ -51,17 +51,53 @@ def app():
         current = scan_dir(current_dir)
         replay = autosave_queue.get()
         if get_track_name(current[0]) == get_replay_track_name(replay):
-            filename = os.path.split(current[0])[1]
-            new_path = os.path.join(finished_dir, filename)
-            os.rename(current[0], new_path)
-            print(f"{filename} was just finished")
+            # move track to current
+            path = move_file(next_queue.get(), current_dir)
+            print(f"added {os.path.split(path)[1]} to current")
+
+            # move track to finished_dir
+            current_queue.get()
+            new_path = move_file(current[0], finished_dir)
+            print(f"{os.path.split(new_path)[1]} was just finished")
+
+            # get medal
+            medal = get_medal(replay, get_track_id(new_path))
+            print(medal)
 
     if not current_queue.empty():
         current_queue.get()
-        # move track from next_queue to current
-        path = move_file(next_queue.get(), current_dir)
-        print(f"added {os.path.split(path)[1]} to current")
-        add_to_next_queue()
+        # only add new track if no tracks in current_dir
+        if len(scan_dir(current_dir)) == 0:
+            # move track from next_queue to current
+            path = move_file(next_queue.get(), current_dir)
+            print(f"added {os.path.split(path)[1]} to current")
+            add_to_next_queue()
+
+
+def get_medal(autosave, track_id):
+    ghost = Gbx(autosave).get_class_by_id(GbxType.CTN_GHOST)
+    if not ghost:
+        return None
+
+    url = "https://tmnf.exchange/api/tracks"
+    params = {
+        "fields": "AuthorTime,GoldTarget,SilverTarget,BronzeTarget",
+        "id": track_id,
+    }
+
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        medals = response.json().get("Results")[0]
+    except requests.RequestException as e:
+        print(f"Request Error: {e}")
+        return None
+
+    for medal in medals:
+        if ghost.race_time <= medals[medal]:
+            return re.sub(r"T.+", "", medal).lower()
+
+    return "none"
 
 
 def get_replay_track_name(path):
@@ -126,9 +162,9 @@ def has_record(track_id):
         return False
 
 
-def has_autosave(path):
+def has_autosave(name):
     global autosaves
-    if path in autosaves:
+    if name in autosaves:
         return True
     return False
 
@@ -157,13 +193,24 @@ if __name__ == "__main__":
     observer.schedule(event_handler, path=autosave_dir, recursive=False)
     observer.start()
 
-    autosaves = set(scan_dir(autosave_dir))
+    fake_autosaves = scan_dir(autosave_dir)
+    autosaves = set()
+    for replay in fake_autosaves:
+        name = get_replay_track_name(replay)
+        autosaves.add(name)
+        fake_autosaves.remove(replay)
+
     unplayed = scan_dir(unplayed_dir)
     current = scan_dir(current_dir)
 
-    # move track in current to unplayed
-    move_file(current[0], unplayed_dir)
-    current.pop()
+    # if no files in current_dir
+    if len(current) == 0:
+        temp = unplayed.pop()
+        current.append(move_file(temp, current_dir))
+
+    for track in current:
+        move_file(track, unplayed_dir)
+        current.remove(track)
 
     # place unplayed track in the next queue
     add_to_next_queue()
