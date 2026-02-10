@@ -1,6 +1,6 @@
 import watchdog.events
 import watchdog.observers
-from time import sleep
+from time import sleep, time
 from queue import Queue
 from pygbx import Gbx, GbxType
 import os
@@ -26,6 +26,25 @@ class Handler(watchdog.events.PatternMatchingEventHandler):
             current_queue.put(event.src_path)
 
 
+def add_to_next_queue():
+    global next_queue, unplayed
+    while next_queue.empty():
+        track = unplayed.pop()
+        if has_autosave(track):
+            continue
+        if has_record(get_track_id(track)):
+            continue
+        next_queue.put(track)
+        print(f"added {os.path.split(track)[1]} to next_queue")
+
+
+def move_file(file_path, dir_path):
+    filename = os.path.split(file_path)[1]
+    new_path = os.path.join(dir_path, filename)
+    os.rename(file_path, new_path)
+    return new_path
+
+
 def app():
     global current_queue, autosave_queue, next_queue
     if not autosave_queue.empty():
@@ -40,18 +59,9 @@ def app():
     if not current_queue.empty():
         current_queue.get()
         # move track from next_queue to current
-        next_track = next_queue.get()
-        filename = os.path.split(next_track)[1]
-        new_path = os.path.join(current_dir, filename)
-        os.rename(next_track, new_path)
-        print(f"added {filename} to current")
-
-        # add new track to next_queue
-        while next_queue.empty():
-            track = unplayed.pop()
-            if has_record(get_track_id(track)):
-                continue
-            next_queue.put(track)
+        path = move_file(next_queue.get(), current_dir)
+        print(f"added {os.path.split(path)[1]} to current")
+        add_to_next_queue()
 
 
 def get_replay_track_name(path):
@@ -116,6 +126,13 @@ def has_record(track_id):
         return False
 
 
+def has_autosave(path):
+    global autosaves
+    if path in autosaves:
+        return True
+    return False
+
+
 def scan_dir(path):
     tracks = []
     for entry in os.scandir(path):
@@ -125,6 +142,7 @@ def scan_dir(path):
 
 
 if __name__ == "__main__":
+    start = time()
     autosave_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Replays/Autosaves"
     current_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Current"
     unplayed_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Unplayed"
@@ -139,25 +157,19 @@ if __name__ == "__main__":
     observer.schedule(event_handler, path=autosave_dir, recursive=False)
     observer.start()
 
+    autosaves = set(scan_dir(autosave_dir))
     unplayed = scan_dir(unplayed_dir)
     current = scan_dir(current_dir)
 
-    # check if track in current is finished
-    if has_record(get_track_id(current[0])):
-        filename = os.path.split(current[0])[1]
-        new_path = os.path.join(finished_dir, filename)
-        os.rename(current[0], new_path)
-        current.pop()
+    # move track in current to unplayed
+    move_file(current[0], unplayed_dir)
+    current.pop()
 
     # place unplayed track in the next queue
-    while next_queue.empty():
-        track = unplayed.pop()
-        if has_record(get_track_id(track)):
-            continue
-        next_queue.put(track)
+    add_to_next_queue()
 
     try:
-        print("starting")
+        print(f"starting took {time() - start}s")
         while True:
             app()
             sleep(0.1)
