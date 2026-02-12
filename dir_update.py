@@ -1,4 +1,5 @@
 import watchdog.events
+from multiprocessing import Pool
 import watchdog.observers
 from time import sleep, time
 from queue import Queue
@@ -50,51 +51,70 @@ def move_file(file_path, dir_path):
 
 
 def app():
-    global current_queue, autosave_queue, next_queue
+    global current_queue, autosave_queue, next_queue, replay_queue
     if not autosave_queue.empty():
         current = scan_dir(current_dir)
         replay = autosave_queue.get()
         if get_track_name(current[0]) == get_replay_track_name(replay):
-            # move track to finished_dir
-            # current_queue.get()
             new_path = move_file(current[0], finished_dir)
+            current_queue.put("stinky")
+            replay_queue.put((replay, new_path))
+
             print(f"{os.path.split(new_path)[1]} was just finished")
 
     if not current_queue.empty():
         current_queue.get()
         if len(scan_dir(current_dir)) == 0:
-            # move track to current_dir
             path = move_file(next_queue.get(), current_dir)
             print(f"added {os.path.split(path)[1]} to current")
             add_to_next_queue()
 
+    if not replay_queue.empty():
+        replay, track = replay_queue.get()
+        medal = get_medal(replay, get_track_id(track))
+        print(medal)
+
+
+def get_medal(autosave, track_id):
+    ghost = Gbx(autosave).get_class_by_id(GbxType.CTN_GHOST)
+    if not ghost:
+        return None
+
+    url = "https://tmnf.exchange/api/tracks"
+    params = {
+        "fields": "AuthorTime,GoldTarget,SilverTarget,BronzeTarget",
+        "id": track_id,
+    }
+
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        medals = response.json().get("Results")[0]
+    except requests.RequestException as e:
+        print(f"Request Error: {e}")
+        return None
+
+    for medal in medals:
+        if ghost.race_time <= medals[medal]:
+            return re.sub(r"T.+", "", medal).lower()
+
+    return "none"
+
 
 def get_replay_track_name(path):
-    try:
-        g = Gbx(path)
-        replay = g.get_class_by_id(GbxType.REPLAY_RECORD)
-        if not replay or not replay.track:
-            g.f.close()
-            raise RuntimeError
-
-        challenge = replay.track.get_class_by_id(GbxType.CHALLENGE)
-
-        if not challenge:
-            return None
+    g = Gbx(path)
+    replay = g.get_class_by_id(GbxType.REPLAY_RECORD)
+    if not replay or not replay.track:
         g.f.close()
-        return challenge.map_name
-    except RuntimeError:
-        return get_replay_track_name_backup(path)
+        print("not replay")
+        return
 
+    challenge = replay.track.get_class_by_id(GbxType.CHALLENGE)
 
-def get_replay_track_name_backup(path):
-    filename = os.path.split(path)[1]
-    clean_string = r"[^a-zA-Z0-9\"\'\\[\]\$\(\)\.\ \-]"
-    track_name = re.sub(clean_string, "", filename)
-    track_name = re.sub(r"^steamuser", "", track_name)
-    track_name = re.sub(r"\.Replay\.gbx$", "", track_name)
-
-    return track_name
+    if not challenge:
+        return None
+    g.f.close()
+    return challenge.map_name
 
 
 def get_track_name(path):
@@ -154,7 +174,7 @@ def scan_dir(path):
 
 
 if __name__ == "__main__":
-    start = time()
+    full_start = time()
     autosave_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Replays/Autosaves"
     current_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Current"
     unplayed_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Unplayed"
@@ -163,37 +183,35 @@ if __name__ == "__main__":
     current_queue = Queue()
     autosave_queue = Queue()
     next_queue = Queue()
+    replay_queue = Queue()
     event_handler = Handler()
     observer = watchdog.observers.Observer()
     observer.schedule(event_handler, path=current_dir, recursive=False)
     observer.schedule(event_handler, path=autosave_dir, recursive=False)
     observer.start()
 
-    fake_autosaves = scan_dir(autosave_dir)
-    autosaves = set()
-    for replay in fake_autosaves:
-        name = get_replay_track_name(replay)
-        autosaves.add(name)
-        fake_autosaves.remove(replay)
+    start = time()
+    files = [entry.path for entry in os.scandir(autosave_dir) if entry.is_file()]
+    with Pool(16) as pool:
+        autosaves = set(pool.imap(get_replay_track_name, files))
+    print(f"took {time() - start}s to scan autosaves")
 
+    start = time()
     unplayed = scan_dir(unplayed_dir)
     current = scan_dir(current_dir)
-    print(len(current))
+    print(f"took {time() - start}s to scan unplayed and current")
 
-    # if no files in current_dir
     if len(current) == 0:
         temp = unplayed.pop()
         current.append(move_file(temp, current_dir))
 
     for track in current:
         move_file(track, unplayed_dir)
-        print(f"removed {track} from current")
     current.clear()
-    # place unplayed track in the next queue
     add_to_next_queue()
 
     try:
-        print(f"starting took {time() - start}s")
+        print(f"starting took {time() - full_start}s")
         while True:
             app()
             sleep(0.1)
