@@ -1,27 +1,80 @@
-import os
+import watchdog.events
+from multiprocessing import Pool
+import watchdog.observers
+from time import sleep, time
+from queue import Queue
 from pygbx import Gbx, GbxType
+import os
 import re
 import requests
-from time import sleep, time
-import logging
 
 
-class ErrorInterceptor(logging.Handler):
-    def emit(self, record):
-        if "Failed to read string" in record.getMessage():
-            raise RuntimeError()
+class Handler(watchdog.events.PatternMatchingEventHandler):
+    global current_queue, autosave_queue, current_dir, autosave_dir
+
+    def __init__(self):
+        # only watch for .gbx files
+        watchdog.events.PatternMatchingEventHandler.__init__(
+            self, patterns=["*.gbx"], ignore_directories=True, case_sensitive=False
+        )
+
+    def on_created(self, event):
+        if os.path.split(event.src_path)[0] == autosave_dir:
+            autosave_queue.put(event.src_path)
+
+    def on_deleted(self, event):
+        if os.path.split(event.src_path)[0] == current_dir:
+            current_queue.put(event.src_path)
 
 
-logger = logging.getLogger()
-logger.addHandler(ErrorInterceptor())
-finished_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Finished"
-current_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Current"
-unplayed_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Unplayed"
-autosaves_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Replays/Autosaves"
-clean_string = r"[^a-zA-Z0-9\"\'\\[\]\$\(\)\.\ \-]"
+def add_to_next_queue():
+    global next_queue, unplayed
+    while next_queue.empty():
+        track = unplayed.pop()
+        if has_autosave(track):
+            print(f"{track} does have an autosave")
+            move_file(track, finished_dir)
+            continue
+        if has_record(get_track_id(track)):
+            print(f"{track} does have a record")
+            move_file(track, finished_dir)
+            continue
+        next_queue.put(track)
+        print(f"added {os.path.split(track)[1]} to next_queue")
 
 
-# TODO: combine with has_record to avoid multiple api calls
+def move_file(file_path, dir_path):
+    filename = os.path.split(file_path)[1]
+    new_path = os.path.join(dir_path, filename)
+    os.rename(file_path, new_path)
+    return new_path
+
+
+def app():
+    global current_queue, autosave_queue, next_queue, replay_queue
+    if not autosave_queue.empty():
+        current = scan_dir(current_dir)
+        replay = autosave_queue.get()
+        if get_track_name(current[0]) == get_replay_track_name(replay):
+            new_path = move_file(current[0], finished_dir)
+            current_queue.put("stinky")
+            replay_queue.put((replay, new_path))
+
+            print(f"{os.path.split(new_path)[1]} was just finished")
+
+    if not current_queue.empty():
+        current_queue.get()
+        if len(scan_dir(current_dir)) == 0:
+            path = move_file(next_queue.get(), current_dir)
+            print(f"added {os.path.split(path)[1]} to current")
+            add_to_next_queue()
+
+    if not replay_queue.empty():
+        replay, track = replay_queue.get()
+        medal = get_medal(replay, get_track_id(track))
+        print(medal)
+
+
 def get_medal(autosave, track_id):
     ghost = Gbx(autosave).get_class_by_id(GbxType.CTN_GHOST)
     if not ghost:
@@ -49,31 +102,19 @@ def get_medal(autosave, track_id):
 
 
 def get_replay_track_name(path):
-    try:
-        g = Gbx(path)
-        replay = g.get_class_by_id(GbxType.REPLAY_RECORD)
-        if not replay or not replay.track:
-            g.f.close()
-            raise RuntimeError
-
-        challenge = replay.track.get_class_by_id(GbxType.CHALLENGE)
-
-        if not challenge:
-            return None
-
+    g = Gbx(path)
+    replay = g.get_class_by_id(GbxType.REPLAY_RECORD)
+    if not replay or not replay.track:
         g.f.close()
-        return challenge.map_name
-    except RuntimeError:
-        return get_replay_track_name_backup(path)
+        print("not replay")
+        return
 
+    challenge = replay.track.get_class_by_id(GbxType.CHALLENGE)
 
-def get_replay_track_name_backup(path):
-    _, filename = os.path.split(path)
-    track_name = re.sub(clean_string, "", filename)
-    track_name = re.sub(r"^steamuser", "", track_name)
-    track_name = re.sub(r"\.Replay\.gbx$", "", track_name)
-
-    return track_name
+    if not challenge:
+        return None
+    g.f.close()
+    return challenge.map_name
 
 
 def get_track_name(path):
@@ -82,13 +123,11 @@ def get_track_name(path):
         challenge = g.get_class_by_id(GbxType.CHALLENGE)
         if not challenge:
             return None
-
         g.f.close()
         return challenge.map_name
     except RuntimeError:
         return None
     except AttributeError:
-        print(path)
         return None
 
 
@@ -100,7 +139,7 @@ def get_track_id(path):
 
 
 def has_record(track_id):
-    url = "https://tmnf.exchange/api/tracks"
+    url = "http://tmnf.exchange/api/tracks"
     params = {"fields": "TrackName", "id": track_id, "inhasrecord": 1}
 
     try:
@@ -112,99 +151,69 @@ def has_record(track_id):
         return False
 
 
-def scan_tracks(path):
+def has_autosave(path):
+    global autosaves
+    name = get_track_name(path)
+    if name in autosaves:
+        return True
+    filename = os.path.split(path)[1]
+    clean_string = r"[^a-zA-Z0-9\"\'\\[\]\$\(\)\.\ \-]"
+    name = re.sub(clean_string, "", filename)
+    if name in autosaves:
+        return True
+
+    return False
+
+
+def scan_dir(path):
     tracks = []
     for entry in os.scandir(path):
-        if not entry.is_file():
-            continue
-
-        track_id = get_track_id(entry.path)
-        track_name = get_track_name(entry.path)
-        tracks.append({"path": entry, "id": track_id, "name": track_name})
+        if entry.is_file():
+            tracks.append(entry.path)
     return tracks
 
 
-def scan_replays(path):
-    replays = []
-    for entry in os.scandir(path):
-        if not entry.is_file():
-            continue
-        name = get_replay_track_name(entry.path)
-        replays.append({"path": entry, "name": name})
-    return replays
+if __name__ == "__main__":
+    full_start = time()
+    autosave_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Replays/Autosaves"
+    current_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Current"
+    unplayed_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Unplayed"
+    finished_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Finished"
 
+    current_queue = Queue()
+    autosave_queue = Queue()
+    next_queue = Queue()
+    replay_queue = Queue()
+    event_handler = Handler()
+    observer = watchdog.observers.Observer()
+    observer.schedule(event_handler, path=current_dir, recursive=False)
+    observer.schedule(event_handler, path=autosave_dir, recursive=False)
+    observer.start()
 
-def main(medals_collected):
-    current = scan_tracks(current_dir)
-    autosaves = scan_replays(autosaves_dir)
+    start = time()
+    files = [entry.path for entry in os.scandir(autosave_dir) if entry.is_file()]
+    with Pool(16) as pool:
+        autosaves = set(pool.imap(get_replay_track_name, files))
+    print(f"took {time() - start}s to scan autosaves")
+
+    start = time()
+    unplayed = scan_dir(unplayed_dir)
+    current = scan_dir(current_dir)
+    print(f"took {time() - start}s to scan unplayed and current")
+
+    if len(current) == 0:
+        current_queue.put("lol")
 
     for track in current:
-        for autosave in autosaves:
-            if autosave["name"] == track["name"]:
-                print(f"{track['name']} is finished")
+        move_file(track, unplayed_dir)
+    current.clear()
+    add_to_next_queue()
 
-                # get medal type
-                medal = get_medal(autosave["path"].path, track["id"])
-                medals_collected[medal] += 1
-
-                # move track into finished directory
-                _, file = os.path.split(track["path"])
-                new_path = os.path.join(finished_dir, file)
-                os.rename(track["path"], new_path)
-
-                current.remove(track)  # update current
-
-    while len(current) < 2:
-        track = unplayed.pop()
-
-        # don't add played maps to current
-        if has_record(track["path"]):
-            os.remove(track["path"])
-            continue
-
-        # move track into current list
-        _, file = os.path.split(track["path"])
-        new_path = os.path.join(current_dir, file)
-        os.rename(track["path"], new_path)
-
-        # update current
-        track["path"] = new_path
-        current.append(track)
-        print(f"Added {track['name']} to current")
-
-    return medals_collected
-
-
-mode = "free"
-timer = 7 * 60
-target = 2
-medals_collected = {"author": 0, "gold": 0, "silver": 0, "bronze": 0, "none": 0}
-unplayed = scan_tracks(unplayed_dir)
-current = scan_tracks(current_dir)
-for track in current:  # remove played maps from current
-    if has_record(track["path"]):
-        os.remove(track["path"])
-        current.pop(track)
-
-
-match mode:
-    case "free":
+    try:
+        print(f"starting took {time() - full_start}s")
         while True:
-            tracks_done = main(medals_collected)
-            print(tracks_done, end="\r")
-            sleep(0.5)
-    case "timed":
-        end_time = time() + timer
-        while time() < end_time:
-            tracks_done = main(medals_collected)
-            t = end_time - time()
-            print(f"{tracks_done}, {t = :.0f}", end="\r")
-            sleep(0.5)
-    case "target":
-        total = 0
-        while total < target - 1:
-            tracks_done = main(medals_collected)
-            for medal_type in tracks_done:
-                total += tracks_done[medal_type]
-            print(f"{tracks_done}, {total = }", end="\r")
-            sleep(0.5)
+            app()
+            sleep(0.1)
+    except KeyboardInterrupt:
+        observer.stop()
+    observer.join()
