@@ -1,9 +1,24 @@
 import os
 import requests
+import watchdog.events
+import watchdog.observers
+from queue import Queue
 
-current_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Current"
-next_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Next"
-current, next = [], []
+
+class Handler(watchdog.events.PatternMatchingEventHandler):
+    def __init__(self):
+        # only watch for .gbx files
+        watchdog.events.PatternMatchingEventHandler.__init__(
+            self, patterns=["*.gbx"], ignore_directories=True, case_sensitive=False
+        )
+
+    def on_created(self, event):
+        if os.path.split(event.src_path)[0] == autosave_dir:
+            autosave_queue.put(event.src_path)
+
+    def on_deleted(self, event):
+        if os.path.split(event.src_path)[0] == current_dir:
+            current_queue.put(event.src_path)
 
 
 def get_new_track(dir_path):
@@ -32,6 +47,18 @@ def start_up():
         current.append(get_new_track(current_dir))
     while len(next) == 0:
         next.append(get_new_track(next_dir))
+
+
+autosave_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Replays/Autosaves"
+current_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Current"
+next_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Next"
+current, next = [], []
+
+event_handler = Handler()
+autosave_queue, current_queue = Queue(), Queue()
+observer = watchdog.observers.Observer()
+observer.schedule(event_handler, path=current_dir, recursive=False)
+observer.schedule(event_handler, path=autosave_dir, recursive=False)
 
 
 start_up()
