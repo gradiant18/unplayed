@@ -202,8 +202,7 @@ if __name__ == "__main__":
     print(f"took {time() - start}s to scan unplayed and current")
 
     if len(current) == 0:
-        temp = unplayed.pop()
-        current.append(move_file(temp, current_dir))
+        current_queue.put("lol")
 
     for track in current:
         move_file(track, unplayed_dir)

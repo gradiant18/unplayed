@@ -3,7 +3,6 @@ import requests
 import random
 import time
 from datetime import datetime
-from multiprocessing import Pool
 
 
 # Function to gather all track IDs from the TMNF Exchange API
@@ -41,7 +40,7 @@ def gather_all_track_ids():
 
 # Function to download a specified number of random maps
 def download_random_maps(no_of_maps_to_download=50, save_folder="TMNF_Maps"):
-    folder_path = f"/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Downloaded/{datetime.now().strftime("%Y-%m-%d")}"
+    folder_path = f"/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Downloaded/{datetime.now().strftime('%Y-%m-%d')}"
     folder_path = f"/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Unplayed"
 
     # Create the save folder if it doesn't exist
