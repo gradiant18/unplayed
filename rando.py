@@ -1,5 +1,7 @@
 import os
+from pygbx import Gbx, GbxType
 from queue import Queue
+import re
 import requests
 import time
 import watchdog.events
@@ -25,7 +27,8 @@ class Handler(watchdog.events.PatternMatchingEventHandler):
 
 
 def get_new_track(dir_path):
-    track_id = requests.get("https://tmnf.exchange/trackrandom?inhasrecord=0").url[32:]
+    random_url = "https://tmnf.exchange/trackrandom?uploadedafter=2010-02&uploadedbefore=2010-03&inhasrecord=0"
+    track_id = requests.get(random_url).url[32:]
     download_url = f"https://tmnf.exchange/trackgbx/{track_id}"
     file_name = f"{track_id}.Challenge.Gbx"
     download_path = os.path.join(dir_path, file_name)
@@ -44,6 +47,54 @@ def move_track(old_path, dir_path):
     new_path = os.path.join(dir_path, filename)
     os.rename(old_path, new_path)
     return new_path
+
+
+def get_replay_time(path):
+    ghost = Gbx(path).get_class_by_id(GbxType.CTN_GHOST)
+    if not ghost:
+        return None
+
+    return ghost.race_time
+
+
+def get_medal_times(path):
+    with open(path, "rb") as file:
+        data = file.read()
+    bronze = re.search(r'bronze="\d+"', str(data))
+    silver = re.search(r'silver="\d+"', str(data))
+    gold = re.search(r'gold="\d+"', str(data))
+    author = re.search(r'authortime="\d+"', str(data))
+    if not bronze:
+        return None
+    if not silver:
+        return None
+    if not gold:
+        return None
+    if not author:
+        return None
+
+    return {
+        "author": int(author.group()[12:-1]),
+        "gold": int(gold.group()[6:-1]),
+        "silver": int(silver.group()[8:-1]),
+        "bronze": int(bronze.group()[8:-1]),
+    }
+
+
+def medal_detector(replay_path, track_path):
+    race_time = get_replay_time(replay_path)
+    medal_times = get_medal_times(track_path)
+
+    if not race_time or not medal_times:
+        return None
+
+    medal = ""
+    for medal_type in medal_times:
+        if race_time <= medal_times[medal_type]:
+            medal = medal_type
+            break
+
+    return medal
 
 
 def start_up():
@@ -67,7 +118,7 @@ def main():
         finished_track = move_track(current[0], finished_dir)
         current.pop(0)
         finished_replay = autosave_queue.get()
-        finished.append((finished_track, finished_replay))
+        finished_queue.put((finished_replay, finished_track))
         print(f"finished {finished_replay}")
 
         current.append(move_track(next[0], current_dir))
@@ -76,18 +127,27 @@ def main():
 
     # only if user deletes track in game
     if not current_queue.empty():
+        current_queue.get()
         if not os.listdir(current_dir):
             current.pop(0)
             current.append(move_track(next[0], current_dir))
             next.pop(0)
             next.append(get_new_track(next_dir))
 
+    if not finished_queue.empty():
+        replay, track = finished_queue.get()
+        medal = medal_detector(replay, track)
+        if medal:
+            print(f"You got the {medal} medal!")
+        else:
+            print("You didn't get any medal :(")
+
 
 autosave_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Replays/Autosaves"
 current_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Current"
 finished_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Finished"
 next_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Next"
-autosave_queue, current_queue = Queue(), Queue()
+autosave_queue, current_queue, finished_queue = Queue(), Queue(), Queue()
 current, next, finished = [], [], []
 
 event_handler = Handler()
@@ -96,9 +156,9 @@ observer.schedule(event_handler, path=current_dir, recursive=False)
 observer.schedule(event_handler, path=autosave_dir, recursive=False)
 observer.start()
 
-
+st = time.time()
 start_up()
-print("finished start_up")
+print(f"finished start_up in {time.time() - st}s")
 try:
     while True:
         main()
