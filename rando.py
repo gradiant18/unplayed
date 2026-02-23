@@ -27,7 +27,10 @@ class Handler(watchdog.events.PatternMatchingEventHandler):
 
 
 def get_new_track(dir_path):
-    random_url = "https://tmnf.exchange/trackrandom?uploadedafter=2010-02&uploadedbefore=2010-03&inhasrecord=0"
+    random_url = """
+        https://tmnf.exchange/trackrandom?inhasrecord=0&uploadedbefore=2010-02-28&uploadedafter=2010-02-01&authortimemax=30999
+    """
+
     track_id = requests.get(random_url).url[32:]
     download_url = f"https://tmnf.exchange/trackgbx/{track_id}"
     file_name = f"{track_id}.Challenge.Gbx"
@@ -111,13 +114,15 @@ def main():
     # new autosave was created
     if not autosave_queue.empty():
         # move finished track to finished_dir
-        finished_track = move_track(current.pop(0)[0], finished_dir)
+        finished_track = move_track(current[0], finished_dir)
+        current.pop(0)
         finished_replay = autosave_queue.get()
         finished_queue.put((finished_replay, finished_track))
         print(f"finished {finished_replay}")
 
         # move next track and download new one
-        current.append(move_track(next.pop(0)[0], current_dir))
+        current.append(move_track(next[0], current_dir))
+        next.pop(0)
         next.append(get_new_track(next_dir))
 
     # only if user deletes track in game
@@ -125,7 +130,8 @@ def main():
         current_queue.get()
         if not os.listdir(current_dir):
             current.pop(0)
-            current.append(move_track(next.pop(0)[0], current_dir))
+            current.append(move_track(next[0], current_dir))
+            next.pop(0)
             next.append(get_new_track(next_dir))
 
     if not finished_queue.empty():

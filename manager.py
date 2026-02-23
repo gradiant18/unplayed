@@ -1,17 +1,16 @@
-import watchdog.events
 from multiprocessing import Pool
-import watchdog.observers
-from time import sleep, time
-from queue import Queue
-from pygbx import Gbx, GbxType
 import os
+from pygbx import Gbx, GbxType
+from queue import Queue
+from random import shuffle
 import re
 import requests
+from time import sleep
+import watchdog.events
+import watchdog.observers
 
 
 class Handler(watchdog.events.PatternMatchingEventHandler):
-    global current_queue, autosave_queue, current_dir, autosave_dir
-
     def __init__(self):
         # only watch for .gbx files
         watchdog.events.PatternMatchingEventHandler.__init__(
@@ -27,10 +26,21 @@ class Handler(watchdog.events.PatternMatchingEventHandler):
             current_queue.put(event.src_path)
 
 
+def filter(track):
+    medal_times = get_medal_times(track)
+    if not medal_times:
+        return False
+    if medal_times["gold"] < 30000:
+        return True
+    return False
+
+
 def add_to_next_queue():
-    global next_queue, unplayed
+    shuffle(unplayed)
     while next_queue.empty():
         track = unplayed.pop()
+        if not filter(track):
+            continue
         if has_autosave(track):
             print(f"{track} does have an autosave")
             move_file(track, finished_dir)
@@ -51,7 +61,6 @@ def move_file(file_path, dir_path):
 
 
 def app():
-    global current_queue, autosave_queue, next_queue, replay_queue
     if not autosave_queue.empty():
         current = scan_dir(current_dir)
         replay = autosave_queue.get()
@@ -71,34 +80,56 @@ def app():
 
     if not replay_queue.empty():
         replay, track = replay_queue.get()
-        medal = get_medal(replay, get_track_id(track))
-        print(medal)
+        medal = medal_detector(replay, track)
+        if medal:
+            print(f"You got the {medal} medal!")
+        else:
+            print("You didn't get any medal :(")
+        finished.append(medal)
 
 
-def get_medal(autosave, track_id):
-    ghost = Gbx(autosave).get_class_by_id(GbxType.CTN_GHOST)
+def get_replay_time(path):
+    ghost = Gbx(path).get_class_by_id(GbxType.CTN_GHOST)
     if not ghost:
         return None
 
-    url = "https://tmnf.exchange/api/tracks"
-    params = {
-        "fields": "AuthorTime,GoldTarget,SilverTarget,BronzeTarget",
-        "id": track_id,
+    return ghost.race_time
+
+
+def get_medal_times(path):
+    with open(path, "rb") as file:
+        data = str(file.read())
+
+    medal_times = []
+    regexes = [r'ortime="\d+"', r'" gold="\d+"', r'silver="\d+"', r'bronze="\d+"']
+    for regex in regexes:
+        if match := re.search(regex, data):
+            medal_times.append(int(match.group()[8:-1]))
+        else:
+            return None
+
+    return {
+        "author": medal_times[0],
+        "gold": medal_times[1],
+        "silver": medal_times[2],
+        "bronze": medal_times[3],
     }
 
-    try:
-        response = requests.get(url, params=params, timeout=10)
-        response.raise_for_status()
-        medals = response.json().get("Results")[0]
-    except requests.RequestException as e:
-        print(f"Request Error: {e}")
+
+def medal_detector(replay_path, track_path):
+    race_time = get_replay_time(replay_path)
+    medal_times = get_medal_times(track_path)
+
+    if not race_time or not medal_times:
         return None
 
-    for medal in medals:
-        if ghost.race_time <= medals[medal]:
-            return re.sub(r"T.+", "", medal).lower()
+    medal = ""
+    for medal_type in medal_times:
+        if race_time <= medal_times[medal_type]:
+            medal = medal_type
+            break
 
-    return "none"
+    return medal
 
 
 def get_replay_track_name(path):
@@ -152,7 +183,6 @@ def has_record(track_id):
 
 
 def has_autosave(path):
-    global autosaves
     name = get_track_name(path)
     if name in autosaves:
         return True
@@ -174,7 +204,6 @@ def scan_dir(path):
 
 
 if __name__ == "__main__":
-    full_start = time()
     autosave_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Replays/Autosaves"
     current_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Current"
     unplayed_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Unplayed"
@@ -190,16 +219,12 @@ if __name__ == "__main__":
     observer.schedule(event_handler, path=autosave_dir, recursive=False)
     observer.start()
 
-    start = time()
     files = [entry.path for entry in os.scandir(autosave_dir) if entry.is_file()]
     with Pool(16) as pool:
         autosaves = set(pool.imap(get_replay_track_name, files))
-    print(f"took {time() - start}s to scan autosaves")
 
-    start = time()
     unplayed = scan_dir(unplayed_dir)
     current = scan_dir(current_dir)
-    print(f"took {time() - start}s to scan unplayed and current")
 
     if len(current) == 0:
         current_queue.put("lol")
@@ -209,11 +234,13 @@ if __name__ == "__main__":
     current.clear()
     add_to_next_queue()
 
+    finished = []
     try:
-        print(f"starting took {time() - full_start}s")
         while True:
             app()
             sleep(0.1)
     except KeyboardInterrupt:
+        print(finished)
+        print(len(finished))
         observer.stop()
     observer.join()
