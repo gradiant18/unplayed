@@ -59,25 +59,21 @@ def get_replay_time(path):
 
 def get_medal_times(path):
     with open(path, "rb") as file:
-        data = file.read()
-    bronze = re.search(r'bronze="\d+"', str(data))
-    silver = re.search(r'silver="\d+"', str(data))
-    gold = re.search(r'gold="\d+"', str(data))
-    author = re.search(r'authortime="\d+"', str(data))
-    if not bronze:
-        return None
-    if not silver:
-        return None
-    if not gold:
-        return None
-    if not author:
-        return None
+        data = str(file.read())
+
+    medal_times = []
+    regexes = [r'ortime="\d+"', r'" gold="\d+"', r'silver="\d+"', r'bronze="\d+"']
+    for regex in regexes:
+        if match := re.search(regex, data):
+            medal_times.append(int(match.group()[8:-1]))
+        else:
+            return None
 
     return {
-        "author": int(author.group()[12:-1]),
-        "gold": int(gold.group()[6:-1]),
-        "silver": int(silver.group()[8:-1]),
-        "bronze": int(bronze.group()[8:-1]),
+        "author": medal_times[0],
+        "gold": medal_times[1],
+        "silver": medal_times[2],
+        "bronze": medal_times[3],
     }
 
 
@@ -115,14 +111,13 @@ def main():
     # new autosave was created
     if not autosave_queue.empty():
         # move finished track to finished_dir
-        finished_track = move_track(current[0], finished_dir)
-        current.pop(0)
+        finished_track = move_track(current.pop(0)[0], finished_dir)
         finished_replay = autosave_queue.get()
         finished_queue.put((finished_replay, finished_track))
         print(f"finished {finished_replay}")
 
-        current.append(move_track(next[0], current_dir))
-        next.pop(0)
+        # move next track and download new one
+        current.append(move_track(next.pop(0)[0], current_dir))
         next.append(get_new_track(next_dir))
 
     # only if user deletes track in game
@@ -130,8 +125,7 @@ def main():
         current_queue.get()
         if not os.listdir(current_dir):
             current.pop(0)
-            current.append(move_track(next[0], current_dir))
-            next.pop(0)
+            current.append(move_track(next.pop(0)[0], current_dir))
             next.append(get_new_track(next_dir))
 
     if not finished_queue.empty():
@@ -139,8 +133,10 @@ def main():
         medal = medal_detector(replay, track)
         if medal:
             print(f"You got the {medal} medal!")
+            finished.append(medal)
         else:
             print("You didn't get any medal :(")
+            finished.append("none")
 
 
 autosave_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Replays/Autosaves"
@@ -164,4 +160,4 @@ try:
         main()
         time.sleep(0.1)
 except KeyboardInterrupt:
-    pass
+    print(finished)
