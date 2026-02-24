@@ -1,3 +1,5 @@
+from datetime import date
+import json
 from multiprocessing import Pool
 import os
 from pygbx import Gbx, GbxType
@@ -203,6 +205,38 @@ def scan_dir(path):
     return tracks
 
 
+def get_todays_tracks():
+    with open("sessions.json") as file:
+        data = json.load(file)
+
+    today = date.today()
+    today = f"{today.year}-{today.month}-{today.day}"
+    try:
+        return data[today]
+    except KeyError:
+        return None
+
+
+def save_todays_tracks():
+    with open("sessions.json") as file:
+        data = json.load(file)
+
+    today = date.today()
+    today = f"{today.year}-{today.month}-{today.day}"
+    data[today] = finished
+
+    with open("sessions.json", "w") as file:
+        json.dump(data, file, indent=2)
+
+
+def tracks_played_today():
+    medals = get_todays_tracks()
+    if not medals:
+        return []
+    else:
+        return medals
+
+
 if __name__ == "__main__":
     autosave_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Replays/Autosaves"
     current_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Current"
@@ -234,13 +268,16 @@ if __name__ == "__main__":
     current.clear()
     add_to_next_queue()
 
-    finished = []
+    finished = tracks_played_today()
     try:
-        while True:
+        while len(finished) < 20:
             app()
             sleep(0.1)
     except KeyboardInterrupt:
-        print(finished)
-        print(len(finished))
-        observer.stop()
+        pass
+
+    print(finished)
+    print(len(finished))
+    save_todays_tracks()
+    observer.stop()
     observer.join()
