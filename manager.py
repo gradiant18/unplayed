@@ -29,7 +29,7 @@ class Handler(PatternMatchingEventHandler):
 
 
 def add_to_next_queue():
-    def __filter(track, max_time):
+    def _filter(track, max_time):
         medal_times = get_medal_times(track)
         if not medal_times:
             return False
@@ -37,7 +37,7 @@ def add_to_next_queue():
             return True
         return False
 
-    def __has_record(path):
+    def _has_record(path):
         match = search(r"\/\d+\.", path)
         if not match:
             return None
@@ -51,7 +51,7 @@ def add_to_next_queue():
             return bool(response.json().get("Results"))
         except requests.RequestException as e:
             print(f"Request Error: {e}")
-            return False
+            return True
 
     global max_time
     shuffle(unplayed)
@@ -65,13 +65,13 @@ def add_to_next_queue():
             print(f"max_time increased to {max_time}")
             continue
 
-        if not __filter(track, max_time):
+        if not _filter(track, max_time):
             continue
         if get_uid(track) in autosaves:
             print(f"{track} has an autosave")
             move_file(track, finished_dir)
             continue
-        if __has_record(track):
+        if _has_record(track):
             print(f"{track} has a record")
             move_file(track, finished_dir)
             continue
@@ -85,7 +85,7 @@ def main():
         replay = autosave_queue.get()
         if get_uid(current[0]) == get_uid(replay):
             new_path = move_file(current[0], finished_dir)
-            current_queue.put("stinky")
+            current_queue.put("")
             replay_queue.put((replay, new_path))
 
             print(f"{os.path.split(new_path)[1]} was just finished")
