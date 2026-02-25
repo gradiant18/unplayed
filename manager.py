@@ -1,21 +1,21 @@
-from medals import medal_detector, get_medal_times
 from multiprocessing import Pool
 import os
+from pygbx2 import get_uid, get_medal, get_medal_times
 from queue import Queue
 from random import shuffle
-import re
+from re import search
 import requests
 from sessions import get_todays_tracks, save_todays_tracks
-import sys
+from sys import argv
 from time import sleep
-import watchdog.events
-import watchdog.observers
+from watchdog.events import PatternMatchingEventHandler
+from watchdog.observers import Observer
 
 
-class Handler(watchdog.events.PatternMatchingEventHandler):
+class Handler(PatternMatchingEventHandler):
     def __init__(self):
         # only watch for .gbx files
-        watchdog.events.PatternMatchingEventHandler.__init__(
+        PatternMatchingEventHandler.__init__(
             self, patterns=["*.gbx"], ignore_directories=True, case_sensitive=False
         )
 
@@ -28,16 +28,31 @@ class Handler(watchdog.events.PatternMatchingEventHandler):
             current_queue.put(event.src_path)
 
 
-def filter(track, max_time):
-    medal_times = get_medal_times(track)
-    if not medal_times:
-        return False
-    if medal_times["gold"] < max_time * 1000:
-        return True
-    return False
-
-
 def add_to_next_queue():
+    def __filter(track, max_time):
+        medal_times = get_medal_times(track)
+        if not medal_times:
+            return False
+        if medal_times["gold"] < max_time * 1000:
+            return True
+        return False
+
+    def __has_record(path):
+        match = search(r"\/\d+\.", path)
+        if not match:
+            return None
+        track_id = match.group()[1:-1]
+        url = "http://tmnf.exchange/api/tracks"
+        params = {"fields": "TrackName", "id": track_id, "inhasrecord": 1}
+
+        try:
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            return bool(response.json().get("Results"))
+        except requests.RequestException as e:
+            print(f"Request Error: {e}")
+            return False
+
     global max_time
     shuffle(unplayed)
     while next_queue.empty():
@@ -50,13 +65,13 @@ def add_to_next_queue():
             print(f"max_time increased to {max_time}")
             continue
 
-        if not filter(track, max_time):
+        if not __filter(track, max_time):
             continue
         if get_uid(track) in autosaves:
             print(f"{track} has an autosave")
             move_file(track, finished_dir)
             continue
-        if has_record(track):
+        if __has_record(track):
             print(f"{track} has a record")
             move_file(track, finished_dir)
             continue
@@ -64,14 +79,7 @@ def add_to_next_queue():
         print(f"added {os.path.split(track)[1]} to next_queue")
 
 
-def move_file(file_path, dir_path):
-    filename = os.path.split(file_path)[1]
-    new_path = os.path.join(dir_path, filename)
-    os.rename(file_path, new_path)
-    return new_path
-
-
-def app():
+def main():
     if not autosave_queue.empty():
         current = scan_dir(current_dir)
         replay = autosave_queue.get()
@@ -91,7 +99,7 @@ def app():
 
     if not replay_queue.empty():
         replay, track = replay_queue.get()
-        medal = medal_detector(replay, track)
+        medal = get_medal(replay, track)
         if medal:
             print(f"You got the {medal} medal!")
         else:
@@ -100,34 +108,11 @@ def app():
         print(f"You've completed {len(finished)} tracks so far.")
 
 
-def get_track_id(path):
-    match = re.search(r"\/\d+\.", path)
-    if not match:
-        return None
-    return match.group()[1:-1]
-
-
-def has_record(path):
-    track_id = get_track_id(path)
-    url = "http://tmnf.exchange/api/tracks"
-    params = {"fields": "TrackName", "id": track_id, "inhasrecord": 1}
-
-    try:
-        response = requests.get(url, params=params, timeout=10)
-        response.raise_for_status()
-        return bool(response.json().get("Results"))
-    except requests.RequestException as e:
-        print(f"Request Error: {e}")
-        return False
-
-
-def get_uid(path):
-    with open(path, "rb") as file:
-        data = str(file.read())
-    match = re.search(r'uid="\w*"', data)
-    if not match:
-        return None
-    return match.group()[5:-1]
+def move_file(file_path, dir_path):
+    filename = os.path.split(file_path)[1]
+    new_path = os.path.join(dir_path, filename)
+    os.rename(file_path, new_path)
+    return new_path
 
 
 def scan_dir(path):
@@ -140,8 +125,8 @@ def scan_dir(path):
 
 if __name__ == "__main__":
     max_time = 30
-    if len(sys.argv) == 2:
-        target_tracks = int(sys.argv[1])
+    if len(argv) == 2:
+        target_tracks = int(argv[1])
     else:
         target_tracks = 50
 
@@ -157,7 +142,7 @@ if __name__ == "__main__":
     next_queue = Queue()
     replay_queue = Queue()
     event_handler = Handler()
-    observer = watchdog.observers.Observer()
+    observer = Observer()
     observer.schedule(event_handler, path=current_dir, recursive=False)
     observer.schedule(event_handler, path=autosave_dir, recursive=False)
     observer.start()
@@ -178,7 +163,7 @@ if __name__ == "__main__":
 
     try:
         while len(finished) < target_tracks:
-            app()
+            main()
             sleep(0.1)
     except KeyboardInterrupt:
         pass
