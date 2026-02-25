@@ -38,8 +38,9 @@ def filter(track, max_time):
 
 
 def add_to_next_queue():
-    max_time = 30
+    global max_time
     shuffle(unplayed)
+    print(unplayed[:5])
     while next_queue.empty():
         try:
             track = unplayed.pop()
@@ -51,12 +52,12 @@ def add_to_next_queue():
 
         if not filter(track, max_time):
             continue
-        if has_autosave(track):
-            print(f"{track} does have an autosave")
+        if get_uid(track) in autosaves:
+            print(f"{track} has an autosave")
             move_file(track, finished_dir)
             continue
-        if has_record(get_track_id(track)):
-            print(f"{track} does have a record")
+        if has_record(track):
+            print(f"{track} has a record")
             move_file(track, finished_dir)
             continue
         next_queue.put(track)
@@ -74,7 +75,7 @@ def app():
     if not autosave_queue.empty():
         current = scan_dir(current_dir)
         replay = autosave_queue.get()
-        if get_track_name(current[0]) == get_replay_track_name(replay):
+        if get_uid(current[0]) == get_uid(replay):
             new_path = move_file(current[0], finished_dir)
             current_queue.put("stinky")
             replay_queue.put((replay, new_path))
@@ -143,36 +144,6 @@ def medal_detector(replay_path, track_path):
     return medal
 
 
-def get_replay_track_name(path):
-    g = Gbx(path)
-    replay = g.get_class_by_id(GbxType.REPLAY_RECORD)
-    if not replay or not replay.track:
-        g.f.close()
-        print("not replay")
-        return
-
-    challenge = replay.track.get_class_by_id(GbxType.CHALLENGE)
-
-    if not challenge:
-        return None
-    g.f.close()
-    return challenge.map_name
-
-
-def get_track_name(path):
-    try:
-        g = Gbx(path)
-        challenge = g.get_class_by_id(GbxType.CHALLENGE)
-        if not challenge:
-            return None
-        g.f.close()
-        return challenge.map_name
-    except RuntimeError:
-        return None
-    except AttributeError:
-        return None
-
-
 def get_track_id(path):
     match = re.search(r"\/\d+\.", path)
     if not match:
@@ -180,7 +151,8 @@ def get_track_id(path):
     return match.group()[1:-1]
 
 
-def has_record(track_id):
+def has_record(path):
+    track_id = get_track_id(path)
     url = "http://tmnf.exchange/api/tracks"
     params = {"fields": "TrackName", "id": track_id, "inhasrecord": 1}
 
@@ -193,17 +165,13 @@ def has_record(track_id):
         return False
 
 
-def has_autosave(path):
-    name = get_track_name(path)
-    if name in autosaves:
-        return True
-    filename = os.path.split(path)[1]
-    clean_string = r"[^a-zA-Z0-9\"\'\\[\]\$\(\)\.\ \-]"
-    name = re.sub(clean_string, "", filename)
-    if name in autosaves:
-        return True
-
-    return False
+def get_uid(path):
+    with open(path, "rb") as file:
+        data = str(file.read())
+    match = re.search(r'uid="\w*"', data)
+    if not match:
+        return None
+    return match.group()[5:-1]
 
 
 def scan_dir(path):
@@ -215,12 +183,13 @@ def scan_dir(path):
 
 
 if __name__ == "__main__":
+    max_time = 30
     if len(sys.argv) == 2:
         target_tracks = int(sys.argv[1])
     else:
         target_tracks = 50
 
-    tracks = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/"
+    tracks = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks"
     autosave_dir = f"{tracks}/Replays/Autosaves"
     current_dir = f"{tracks}/Challenges/Current"
     unplayed_dir = f"{tracks}/Challenges/Unplayed"
@@ -239,7 +208,7 @@ if __name__ == "__main__":
 
     files = [entry.path for entry in os.scandir(autosave_dir) if entry.is_file()]
     with Pool(16) as pool:
-        autosaves = set(pool.imap(get_replay_track_name, files))
+        autosaves = set(pool.imap(get_uid, files))
 
     if not (entries := list(os.scandir(current_dir))):
         current_queue.put("")
