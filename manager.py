@@ -1,5 +1,3 @@
-from datetime import date
-import json
 from multiprocessing import Pool
 import os
 from pygbx import Gbx, GbxType
@@ -7,6 +5,7 @@ from queue import Queue
 from random import shuffle
 import re
 import requests
+from sessions import get_todays_tracks, save_todays_tracks
 import sys
 from time import sleep
 import watchdog.events
@@ -215,38 +214,6 @@ def scan_dir(path):
     return tracks
 
 
-def get_todays_tracks():
-    with open("sessions.json") as file:
-        data = json.load(file)
-
-    today = date.today()
-    today = f"{today.year}-{today.month}-{today.day}"
-    try:
-        return data[today]
-    except KeyError:
-        return None
-
-
-def save_todays_tracks():
-    with open("sessions.json") as file:
-        data = json.load(file)
-
-    today = date.today()
-    today = f"{today.year}-{today.month}-{today.day}"
-    data[today] = finished
-
-    with open("sessions.json", "w") as file:
-        json.dump(data, file, indent=2)
-
-
-def tracks_played_today():
-    medals = get_todays_tracks()
-    if not medals:
-        return []
-    else:
-        return medals
-
-
 if __name__ == "__main__":
     if len(sys.argv) == 2:
         target_tracks = int(sys.argv[1])
@@ -258,6 +225,7 @@ if __name__ == "__main__":
     current_dir = f"{tracks}/Challenges/Current"
     unplayed_dir = f"{tracks}/Challenges/Unplayed"
     finished_dir = f"{tracks}/Challenges/Finished"
+    sessions_path = "sessions.json"
 
     current_queue = Queue()
     autosave_queue = Queue()
@@ -280,9 +248,9 @@ if __name__ == "__main__":
 
     current = []
     unplayed = scan_dir(unplayed_dir)
+    finished = get_todays_tracks(sessions_path)
     add_to_next_queue()
 
-    finished = tracks_played_today()
     try:
         while len(finished) < target_tracks:
             app()
@@ -291,7 +259,6 @@ if __name__ == "__main__":
         pass
 
     print(finished)
-    print(len(finished))
-    save_todays_tracks()
+    save_todays_tracks(sessions_path, finished)
     observer.stop()
     observer.join()
