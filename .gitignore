@@ -1,4 +1,4 @@
-.$manager.drawio.bkp
-manager.drawio
-*.gbx
-*.Gbx
+__pycache__/*
+venv/*
+ids.txt
+sessions.json
