@@ -40,12 +40,12 @@ def filter(track, max_time):
 def add_to_next_queue():
     global max_time
     shuffle(unplayed)
-    print(unplayed[:5])
     while next_queue.empty():
         try:
             track = unplayed.pop()
         except IndexError:
             unplayed.extend(scan_dir(unplayed_dir))
+            shuffle(unplayed)
             max_time += 5
             print(f"max_time increased to {max_time}")
             continue
@@ -231,3 +231,4 @@ if __name__ == "__main__":
     save_todays_tracks(sessions_path, finished)
     observer.stop()
     observer.join()
+
