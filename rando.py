@@ -17,18 +17,16 @@ class Handler(watchdog.events.PatternMatchingEventHandler):
 
     def on_created(self, event):
         if os.path.split(event.src_path)[0] == autosave_dir:
-            print("new autosave")
             autosave_queue.put(event.src_path)
 
     def on_deleted(self, event):
         if os.path.split(event.src_path)[0] == current_dir:
-            print("file deleted")
             current_queue.put(event.src_path)
 
 
 def get_new_track(dir_path):
     random_url = """
-        https://tmnf.exchange/trackrandom?inhasrecord=0&uploadedbefore=2010-02-28&uploadedafter=2010-02-01&authortimemax=30999
+        https://tmnf.exchange/trackrandom?inhasrecord=0&uploadedbefore=2010-02-28&uploadedafter=2010-02-01&authortimemax=35000
     """
 
     track_id = requests.get(random_url).url[32:]
@@ -42,7 +40,7 @@ def get_new_track(dir_path):
         with open(download_path, "wb") as file:
             file.write(map_response.content)
         return download_path
-    return False
+    return None
 
 
 def move_track(old_path, dir_path):
@@ -53,11 +51,9 @@ def move_track(old_path, dir_path):
 
 
 def get_replay_time(path):
-    ghost = Gbx(path).get_class_by_id(GbxType.CTN_GHOST)
-    if not ghost:
-        return None
-
-    return ghost.race_time
+    if ghost := Gbx(path).get_class_by_id(GbxType.CTN_GHOST):
+        return ghost.race_time
+    return None
 
 
 def get_medal_times(path):
@@ -114,15 +110,13 @@ def main():
     # new autosave was created
     if not autosave_queue.empty():
         # move finished track to finished_dir
-        finished_track = move_track(current[0], finished_dir)
-        current.pop(0)
+        finished_track = move_track(current.pop(0), finished_dir)
         finished_replay = autosave_queue.get()
         finished_queue.put((finished_replay, finished_track))
         print(f"finished {finished_replay}")
 
         # move next track and download new one
-        current.append(move_track(next[0], current_dir))
-        next.pop(0)
+        current.append(move_track(next.pop(0), current_dir))
         next.append(get_new_track(next_dir))
 
     # only if user deletes track in game
@@ -130,8 +124,7 @@ def main():
         current_queue.get()
         if not os.listdir(current_dir):
             current.pop(0)
-            current.append(move_track(next[0], current_dir))
-            next.pop(0)
+            current.append(move_track(next.pop(0), current_dir))
             next.append(get_new_track(next_dir))
 
     if not finished_queue.empty():

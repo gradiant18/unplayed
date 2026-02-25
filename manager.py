@@ -7,6 +7,7 @@ from queue import Queue
 from random import shuffle
 import re
 import requests
+import sys
 from time import sleep
 import watchdog.events
 import watchdog.observers
@@ -28,20 +29,28 @@ class Handler(watchdog.events.PatternMatchingEventHandler):
             current_queue.put(event.src_path)
 
 
-def filter(track):
+def filter(track, max_time):
     medal_times = get_medal_times(track)
     if not medal_times:
         return False
-    if medal_times["gold"] < 30000:
+    if medal_times["gold"] < max_time * 1000:
         return True
     return False
 
 
 def add_to_next_queue():
+    global unplayed, max_time
     shuffle(unplayed)
     while next_queue.empty():
-        track = unplayed.pop()
-        if not filter(track):
+        try:
+            track = unplayed.pop()
+        except IndexError:
+            unplayed.extend(scan_dir(unplayed_dir))
+            max_time += 5
+            print(f"max_time increased to {max_time}")
+            continue
+
+        if not filter(track, max_time):
             continue
         if has_autosave(track):
             print(f"{track} does have an autosave")
@@ -88,6 +97,7 @@ def app():
         else:
             print("You didn't get any medal :(")
         finished.append(medal)
+        print(f"You've completed {len(finished)} tracks so far.")
 
 
 def get_replay_time(path):
@@ -238,6 +248,12 @@ def tracks_played_today():
 
 
 if __name__ == "__main__":
+    max_time = 30
+    if len(sys.argv) == 2:
+        target_tracks = int(sys.argv[1])
+    else:
+        target_tracks = 50
+
     autosave_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Replays/Autosaves"
     current_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Current"
     unplayed_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Unplayed"
@@ -270,7 +286,7 @@ if __name__ == "__main__":
 
     finished = tracks_played_today()
     try:
-        while len(finished) < 20:
+        while len(finished) < target_tracks:
             app()
             sleep(0.1)
     except KeyboardInterrupt:
