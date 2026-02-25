@@ -39,7 +39,7 @@ def filter(track, max_time):
 
 
 def add_to_next_queue():
-    global unplayed, max_time
+    max_time = 30
     shuffle(unplayed)
     while next_queue.empty():
         try:
@@ -248,16 +248,16 @@ def tracks_played_today():
 
 
 if __name__ == "__main__":
-    max_time = 30
     if len(sys.argv) == 2:
         target_tracks = int(sys.argv[1])
     else:
         target_tracks = 50
 
-    autosave_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Replays/Autosaves"
-    current_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Current"
-    unplayed_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Unplayed"
-    finished_dir = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/Challenges/Finished"
+    tracks = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks/"
+    autosave_dir = f"{tracks}/Replays/Autosaves"
+    current_dir = f"{tracks}/Challenges/Current"
+    unplayed_dir = f"{tracks}/Challenges/Unplayed"
+    finished_dir = f"{tracks}/Challenges/Finished"
 
     current_queue = Queue()
     autosave_queue = Queue()
@@ -273,15 +273,13 @@ if __name__ == "__main__":
     with Pool(16) as pool:
         autosaves = set(pool.imap(get_replay_track_name, files))
 
+    if not (entries := list(os.scandir(current_dir))):
+        current_queue.put("")
+    for entry in entries:
+        move_file(entry.path, unplayed_dir)
+
+    current = []
     unplayed = scan_dir(unplayed_dir)
-    current = scan_dir(current_dir)
-
-    if len(current) == 0:
-        current_queue.put("lol")
-
-    for track in current:
-        move_file(track, unplayed_dir)
-    current.clear()
     add_to_next_queue()
 
     finished = tracks_played_today()
