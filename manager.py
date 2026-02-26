@@ -6,6 +6,7 @@ from random import shuffle
 from re import search
 import requests
 from sessions import get_todays_tracks, save_todays_tracks
+import subprocess
 from sys import argv
 from time import sleep
 from watchdog.events import PatternMatchingEventHandler
@@ -26,6 +27,24 @@ class Handler(PatternMatchingEventHandler):
     def on_deleted(self, event):
         if os.path.split(event.src_path)[0] == current_dir:
             current_queue.put(event.src_path)
+
+
+def load_track(track_path):
+    exe = "/home/russell/.steam/steam/steamapps/common/TrackMania United/TmForever.exe"
+    command = [
+        "protontricks-launch",
+        "--appid",
+        "7200",
+        exe,
+        "/useexedir",
+        "/singleinst",
+        f"/file={track_path}",
+    ]
+
+    try:
+        subprocess.run(command, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Error launching game: {e}")
 
 
 def add_to_next_queue():
@@ -95,6 +114,7 @@ def main():
         if len(scan_dir(current_dir)) == 0:
             path = move_file(next_queue.get(), current_dir)
             print(f"added {os.path.split(path)[1]} to current")
+            load_track(path)
             add_to_next_queue()
 
     if not replay_queue.empty():
