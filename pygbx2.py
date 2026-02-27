@@ -47,7 +47,7 @@ def get_medal_time(path, medal=None):
             "silver": medal_times[2],
             "bronze": medal_times[3],
         }
-    elif medal == ("author" or "gold" or "silver" or "bronze"):
+    elif medal in ["author", "gold", "silver", "bronze"]:
         if not (match := search(regexes[medal], data)):
             return None
         return {f"{medal}": int(match.group()[8:-1])}
