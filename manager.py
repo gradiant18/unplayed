@@ -1,9 +1,7 @@
 from multiprocessing import Pool
 import os
-from pygbx2 import get_uid, get_medal, get_medal_time
+from pygbx2 import get_uid, get_medal
 from queue import Queue
-from random import shuffle
-from re import search
 import requests
 from sessions import get_todays_tracks, save_todays_tracks
 import subprocess
@@ -29,8 +27,55 @@ class Handler(PatternMatchingEventHandler):
             autosave_queue.put(event.src_path)
 
     def on_deleted(self, event):
-        if os.path.split(event.src_path)[0] == current_dir:
+        if os.path.split(event.src_path)[0] == randomizer_dir:
             current_queue.put(event.src_path)
+
+
+def get_ids(max_time):
+    start_date = "2010-02-01T00:00:00"
+    end_date = "2010-02-28T23:59:59"
+
+    api_url = (
+        f"https://tmnf.exchange/api/tracks?"
+        f"uploadedafter={start_date}&"
+        f"uploadedbefore={end_date}&"
+        f"inhasrecord=0&"
+        f"fields=TrackId,UId&"
+        f"authortimemax={max_time * 1000}&"
+        f"count=1000"
+    )
+
+    ids = set()
+    current_last = 0
+
+    while True:
+        paginated_url = f"{api_url}&after={current_last}"
+        try:
+            response = requests.get(paginated_url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+
+            results = data.get("Results", [])
+            if not results:
+                break
+
+            for track in results:
+                tid = track["TrackId"]
+                uid = track["UId"]
+                ids.add((tid, uid))
+
+            if not data.get("More", False):
+                break
+
+            current_last = results[-1]["TrackId"]
+            sleep(0.1)
+
+        except requests.exceptions.RequestException as e:
+            print(f"error: {e}")
+            sleep(1)
+            continue
+
+    return ids
 
 
 def load_track(track_path):
@@ -50,76 +95,74 @@ def load_track(track_path):
         print(f"Error launching game: {e}")
 
 
-def add_to_next_queue():
-    def _filter(track, max_time):
-        medal_times = get_medal_time(track, "gold")
-        if not medal_times:
-            return False
-        if medal_times["gold"] <= max_time * 1000:
-            return True
-        return False
+def download_track(track_id):
+    download_url = f"https://tmnf.exchange/trackgbx/{track_id}"
 
-    def _has_record(path):
-        match = search(r"\/\d+\.", path)
-        if not match:
-            return None
-        track_id = match.group()[1:-1]
-        url = "http://tmnf.exchange/api/tracks"
-        params = {"fields": "TrackName", "id": track_id, "inhasrecord": 1}
+    file_name = f"{track_id}.Challenge.Gbx"
+    file_path = os.path.join(randomizer_dir, file_name)
 
+    if os.path.exists(file_path):
+        print(f"Map {file_name} already exists. Skipping download.")
+        return
+
+    retries = 0
+    while retries < 3:
         try:
-            response = requests.get(url, params=params, timeout=10)
-            response.raise_for_status()
-            return bool(response.json().get("Results"))
+            map_response = requests.get(download_url, timeout=10)
+            if map_response.status_code == 200:
+                with open(file_path, "wb") as file:
+                    file.write(map_response.content)
+                return file_path
+            else:
+                print(
+                    f"Failed to download map ID {track_id}, status code: {map_response.status_code}"
+                )
+            retries += 1
+            sleep(1)
         except requests.RequestException as e:
-            print(f"Request Error: {e}")
-            return True
+            print(f"Retry {retries + 1}/3 failed for map ID {track_id}: {e}")
+            retries += 1
+            sleep(1)
 
-    global max_time
-    shuffle(unplayed)
+
+def add_to_next_queue():
+    global unplayed, max_time
     while next_queue.empty():
         try:
-            track = unplayed.pop()
+            track_id, track_uid = unplayed.pop()
         except IndexError:
-            unplayed.extend(scan_dir(unplayed_dir))
-            shuffle(unplayed)
             max_time += 5
+            unplayed = get_ids(max_time)
             print(f"max_time increased to {max_time}")
             continue
 
-        if not _filter(track, max_time):
+        if track_uid in autosaves:
+            print(f"{track_id} has an autosave")
             continue
-        if get_uid(track) in autosaves:
-            print(f"{track} has an autosave")
-            move_file(track, finished_dir)
-            continue
-        if _has_record(track):
-            print(f"{track} has a record")
-            move_file(track, finished_dir)
-            continue
-        next_queue.put(track)
-        print(f"added {os.path.split(track)[1]} to next_queue")
+
+        track_path = download_track(track_id)
+        next_queue.put(track_path)
+        print(f"added {track_id} to next_queue")
 
 
 def main():
+    global current_track
     if not autosave_queue.empty():
-        current = scan_dir(current_dir)
         replay = autosave_queue.get()
-        if get_uid(current[0]) == get_uid(replay):
-            if get_medal(replay, current[0]) != "author":
+        if get_uid(current_track) == get_uid(replay):
+            if get_medal(replay, current_track) != "author":
                 return
-            new_path = move_file(current[0], finished_dir)
+            replay_queue.put((replay, current_track))
             current_queue.put("")
-            replay_queue.put((replay, new_path))
 
-            print(f"{os.path.split(new_path)[1]} was just finished")
+            print(f"{os.path.split(current_track)[1]} was just finished")
 
     if not current_queue.empty():
         current_queue.get()
         if len(scan_dir(current_dir)) == 0:
-            path = move_file(next_queue.get(), current_dir)
-            print(f"added {os.path.split(path)[1]} to current")
-            load_track(path)
+            current_track = next_queue.get()
+            print(f"Playing {os.path.split(current_track)[1]}")
+            load_track(current_track)
             add_to_next_queue()
 
     if not replay_queue.empty():
@@ -149,7 +192,7 @@ def scan_dir(path):
 
 
 if __name__ == "__main__":
-    max_time = 30
+    max_time = 50
     if len(argv) == 2:
         target_tracks = int(argv[1])
     else:
@@ -160,6 +203,7 @@ if __name__ == "__main__":
     current_dir = f"{tracks}/Challenges/Current"
     unplayed_dir = f"{tracks}/Challenges/Unplayed"
     finished_dir = f"{tracks}/Challenges/Finished"
+    randomizer_dir = f"{tracks}/Challenges/Randomizer"
     sessions_path = "sessions.json"
 
     current_queue = Queue()
@@ -172,17 +216,16 @@ if __name__ == "__main__":
     observer.schedule(event_handler, path=autosave_dir, recursive=False)
     observer.start()
 
+    # get list of uid's for autosaves
     files = [entry.path for entry in os.scandir(autosave_dir) if entry.is_file()]
     with Pool(16) as pool:
         autosaves = set(pool.imap(get_uid, files))
 
-    if not (entries := list(os.scandir(current_dir))):
-        current_queue.put("")
-    for entry in entries:
-        move_file(entry.path, unplayed_dir)
+    while not (unplayed := get_ids(max_time)):
+        max_time += 5
 
-    current = []
-    unplayed = scan_dir(unplayed_dir)
+    current_track = ""
+    current_queue.put("")
     finished = get_todays_tracks(sessions_path)
     add_to_next_queue()
 
