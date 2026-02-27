@@ -19,16 +19,10 @@ class Handler(PatternMatchingEventHandler):
         )
 
     def on_created(self, event):
-        if os.path.split(event.src_path)[0] == autosave_dir:
-            autosave_queue.put(event.src_path)
+        autosave_queue.put(event.src_path)
 
     def on_modified(self, event):
-        if os.path.split(event.src_path)[0] == autosave_dir:
-            autosave_queue.put(event.src_path)
-
-    def on_deleted(self, event):
-        if os.path.split(event.src_path)[0] == randomizer_dir:
-            current_queue.put(event.src_path)
+        autosave_queue.put(event.src_path)
 
 
 def get_ids(max_time):
@@ -60,9 +54,7 @@ def get_ids(max_time):
                 break
 
             for track in results:
-                tid = track["TrackId"]
-                uid = track["UId"]
-                ids.add((tid, uid))
+                ids.add((track["TrackId"], track["UId"]))
 
             if not data.get("More", False):
                 break
@@ -103,7 +95,7 @@ def download_track(track_id):
 
     if os.path.exists(file_path):
         print(f"Map {file_name} already exists. Skipping download.")
-        return
+        return file_path
 
     retries = 0
     while retries < 3:
@@ -153,15 +145,8 @@ def main():
             if get_medal(replay, current_track) != "author":
                 return
             replay_queue.put((replay, current_track))
-            current_queue.put("")
-
             print(f"{os.path.split(current_track)[1]} was just finished")
-
-    if not current_queue.empty():
-        current_queue.get()
-        if len(scan_dir(current_dir)) == 0:
             current_track = next_queue.get()
-            print(f"Playing {os.path.split(current_track)[1]}")
             load_track(current_track)
             add_to_next_queue()
 
@@ -176,21 +161,6 @@ def main():
         print(f"You've completed {len(finished)} tracks so far.")
 
 
-def move_file(file_path, dir_path):
-    filename = os.path.split(file_path)[1]
-    new_path = os.path.join(dir_path, filename)
-    os.rename(file_path, new_path)
-    return new_path
-
-
-def scan_dir(path):
-    tracks = []
-    for entry in os.scandir(path):
-        if entry.is_file():
-            tracks.append(entry.path)
-    return tracks
-
-
 if __name__ == "__main__":
     max_time = 50
     if len(argv) == 2:
@@ -200,19 +170,14 @@ if __name__ == "__main__":
 
     tracks = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks"
     autosave_dir = f"{tracks}/Replays/Autosaves"
-    current_dir = f"{tracks}/Challenges/Current"
-    unplayed_dir = f"{tracks}/Challenges/Unplayed"
-    finished_dir = f"{tracks}/Challenges/Finished"
     randomizer_dir = f"{tracks}/Challenges/Randomizer"
     sessions_path = "sessions.json"
 
-    current_queue = Queue()
     autosave_queue = Queue()
     next_queue = Queue()
     replay_queue = Queue()
     event_handler = Handler()
     observer = Observer()
-    observer.schedule(event_handler, path=current_dir, recursive=False)
     observer.schedule(event_handler, path=autosave_dir, recursive=False)
     observer.start()
 
@@ -224,9 +189,11 @@ if __name__ == "__main__":
     while not (unplayed := get_ids(max_time)):
         max_time += 5
 
-    current_track = ""
-    current_queue.put("")
     finished = get_todays_tracks(sessions_path)
+    add_to_next_queue()
+    current_track = next_queue.get()
+    print(f"Playing {current_track}")
+    load_track(current_track)
     add_to_next_queue()
 
     try:
