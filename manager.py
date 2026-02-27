@@ -30,12 +30,11 @@ class Handler(PatternMatchingEventHandler):
 
 
 def load_track(track_path):
-    exe = "/home/russell/.steam/steam/steamapps/common/TrackMania United/TmForever.exe"
     command = [
         "protontricks-launch",
         "--appid",
         "7200",
-        exe,
+        "/home/russell/.steam/steam/steamapps/common/TrackMania United/TmForever.exe",
         "/useexedir",
         "/singleinst",
         f"/file={track_path}",
@@ -52,7 +51,7 @@ def add_to_next_queue():
         medal_times = get_medal_times(track)
         if not medal_times:
             return False
-        if medal_times["gold"] < max_time * 1000:
+        if medal_times["gold"] <= max_time * 1000:
             return True
         return False
 
