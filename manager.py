@@ -1,6 +1,6 @@
 from multiprocessing import Pool
 import os
-from pygbx2 import get_uid, get_medal, get_medal_times
+from pygbx2 import get_uid, get_medal, get_medal_time
 from queue import Queue
 from random import shuffle
 from re import search
@@ -48,7 +48,7 @@ def load_track(track_path):
 
 def add_to_next_queue():
     def _filter(track, max_time):
-        medal_times = get_medal_times(track)
+        medal_times = get_medal_time(track, "gold")
         if not medal_times:
             return False
         if medal_times["gold"] <= max_time * 1000:
