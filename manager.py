@@ -24,6 +24,10 @@ class Handler(PatternMatchingEventHandler):
         if os.path.split(event.src_path)[0] == autosave_dir:
             autosave_queue.put(event.src_path)
 
+    def on_modified(self, event):
+        if os.path.split(event.src_path)[0] == autosave_dir:
+            autosave_queue.put(event.src_path)
+
     def on_deleted(self, event):
         if os.path.split(event.src_path)[0] == current_dir:
             current_queue.put(event.src_path)
@@ -102,6 +106,8 @@ def main():
         current = scan_dir(current_dir)
         replay = autosave_queue.get()
         if get_uid(current[0]) == get_uid(replay):
+            if get_medal(replay, current[0]) != "author":
+                return
             new_path = move_file(current[0], finished_dir)
             current_queue.put("")
             replay_queue.put((replay, new_path))
