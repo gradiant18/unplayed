@@ -153,6 +153,7 @@ def new_autosave(replay):
     autosaves.add(replay_uid)
 
 
+# Source - https://stackoverflow.com/a/68238146
 def format_timedelta(td):
     hours, remainder = divmod(td.seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
