@@ -1,3 +1,4 @@
+import datetime
 from multiprocessing import Pool
 import os
 from pygbx2 import get_uid, get_medal
@@ -5,10 +6,10 @@ from queue import Queue
 import requests
 from sessions import get_todays_tracks, save_todays_tracks
 import subprocess
-from sys import argv
 from time import sleep
 from watchdog.events import PatternMatchingEventHandler
 from watchdog.observers import Observer
+import yaml
 
 
 class Handler(PatternMatchingEventHandler):
@@ -25,27 +26,27 @@ class Handler(PatternMatchingEventHandler):
         autosave_queue.put(event.src_path)
 
 
-def get_ids(max_time):
-    start_date = "2010-02-01T00:00:00"
-    end_date = "2010-02-28T23:59:59"
+def load_config(path):
+    with open(path) as file:
+        config = yaml.safe_load(file)
+    return config
 
-    api_url = (
-        f"https://tmnf.exchange/api/tracks?"
-        f"uploadedafter={start_date}&"
-        f"uploadedbefore={end_date}&"
-        f"inhasrecord=0&"
-        f"fields=TrackId,UId&"
-        f"authortimemax={max_time * 1000}&"
-        f"count=1000"
-    )
+
+def get_ids():
+    api_url = "https://tmnf.exchange/api/tracks?"
+    params = {"fields": "TrackId,UId", "count": 1000}
+    for param in config["track_rules"]:
+        value = config["track_rules"][f"{param}"]
+        if value is not None:
+            params[f"{param}"] = value
 
     ids = set()
     current_last = 0
 
     while True:
-        paginated_url = f"{api_url}&after={current_last}"
         try:
-            response = requests.get(paginated_url, timeout=10)
+            params["after"] = current_last
+            response = requests.get(api_url, params=params, timeout=10)
             response.raise_for_status()
             data = response.json()
 
@@ -60,7 +61,6 @@ def get_ids(max_time):
                 break
 
             current_last = results[-1]["TrackId"]
-            sleep(0.1)
 
         except requests.exceptions.RequestException as e:
             print(f"error: {e}")
@@ -71,11 +71,12 @@ def get_ids(max_time):
 
 
 def load_track(track_path):
+    # print(f"Playing {current_track}")
     command = [
         "protontricks-launch",
         "--appid",
         "7200",
-        "/home/russell/.steam/steam/steamapps/common/TrackMania United/TmForever.exe",
+        config["exe_dir"],
         "/useexedir",
         "/singleinst",
         f"/file={track_path}",
@@ -94,7 +95,7 @@ def download_track(track_id):
     file_path = os.path.join(randomizer_dir, file_name)
 
     if os.path.exists(file_path):
-        print(f"Map {file_name} already exists. Skipping download.")
+        # print(f"Map {file_name} already exists. Skipping download.")
         return file_path
 
     retries = 0
@@ -122,19 +123,17 @@ def add_to_next_queue():
     while next_queue.empty():
         try:
             track_id, track_uid = unplayed.pop()
-        except IndexError:
-            max_time += 5
-            unplayed = get_ids(max_time)
-            print(f"max_time increased to {max_time}")
-            continue
+        except KeyError:
+            print("No tracks remaining")
+            quit()
 
         if track_uid in autosaves:
-            print(f"{track_id} has an autosave")
+            # print(f"{track_id} has an autosave")
             continue
 
         track_path = download_track(track_id)
         next_queue.put(track_path)
-        print(f"added {track_id} to next_queue")
+        # print(f"added {track_id} to next_queue")
 
 
 def main():
@@ -142,10 +141,11 @@ def main():
     if not autosave_queue.empty():
         replay = autosave_queue.get()
         if get_uid(current_track) == get_uid(replay):
-            if get_medal(replay, current_track) != "author":
+            if get_medal(replay, current_track) != config["game_rules"]["next_mode"]:
+                # print("not quite fast enough")
                 return
             replay_queue.put((replay, current_track))
-            print(f"{os.path.split(current_track)[1]} was just finished")
+            # print(f"{os.path.split(current_track)[1]} was just finished")
             current_track = next_queue.get()
             load_track(current_track)
             add_to_next_queue()
@@ -153,24 +153,20 @@ def main():
     if not replay_queue.empty():
         replay, track = replay_queue.get()
         medal = get_medal(replay, track)
-        if medal:
-            print(f"You got the {medal} medal!")
-        else:
-            print("You didn't get any medal :(")
+        # if medal:
+        # print(f"You got the {medal} medal!")
+        # else:
+        # print("You didn't get any medal :(")
         finished.append(medal)
-        print(f"You've completed {len(finished)} tracks so far.")
+        # print(f"You've completed {len(finished)} tracks so far.")
 
 
 if __name__ == "__main__":
-    max_time = 50
-    if len(argv) == 2:
-        target_tracks = int(argv[1])
-    else:
-        target_tracks = 50
+    config = load_config("config.yaml")
 
-    tracks = "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks"
-    autosave_dir = f"{tracks}/Replays/Autosaves"
-    randomizer_dir = f"{tracks}/Challenges/Randomizer"
+    track_dir = config["track_dir"]
+    autosave_dir = f"{track_dir}/Replays/Autosaves"
+    randomizer_dir = f"{track_dir}/Challenges/{config['download_track_dir']}"
     sessions_path = "sessions.json"
 
     autosave_queue = Queue()
@@ -181,24 +177,54 @@ if __name__ == "__main__":
     observer.schedule(event_handler, path=autosave_dir, recursive=False)
     observer.start()
 
-    # get list of uid's for autosaves
+    finished = get_todays_tracks(sessions_path)
+    if len(finished) >= config["game_rules"]["track_limit"]:
+        print("Already achieved track limit")
+        quit()
+
+    # get set of uid's for autosaves
     files = [entry.path for entry in os.scandir(autosave_dir) if entry.is_file()]
     with Pool(16) as pool:
         autosaves = set(pool.imap(get_uid, files))
 
-    while not (unplayed := get_ids(max_time)):
-        max_time += 5
+    # get set of available track ids
+    unplayed = get_ids()
+    if not unplayed:
+        print("No tracks found")
 
-    finished = get_todays_tracks(sessions_path)
+    # start playing first track
     add_to_next_queue()
     current_track = next_queue.get()
-    print(f"Playing {current_track}")
     load_track(current_track)
     add_to_next_queue()
 
+    # set up for time limit
+    now = datetime.datetime.now()
+    time_limit = config["game_rules"]["time_limit"]
+    delta = datetime.timedelta(
+        hours=int(time_limit[:2]),
+        minutes=int(time_limit[3:5]),
+        seconds=int(time_limit[6:]),
+    )
+    stop_time = now + delta
+
+    track_limit = int(config["game_rules"]["track_limit"])
+    enough_tracks = len(finished) >= track_limit
+    enough_time = datetime.datetime.now() >= stop_time
+
     try:
-        while len(finished) < target_tracks:
+        while not enough_tracks and not enough_time:
             main()
+            enough_tracks = len(finished) >= track_limit
+            enough_time = datetime.datetime.now() >= stop_time
+            track = os.path.split(current_track)[1]
+            tracks_played = len(finished)
+            tracks_left = track_limit - tracks_played
+            time_left = stop_time - datetime.datetime.now()
+            print(
+                f"Playing {track} | Tracks Played: {tracks_played} | Tracks Left: {tracks_left} | Time Left: {time_left}",
+                end="\r",
+            )
             sleep(0.1)
     except KeyboardInterrupt:
         pass

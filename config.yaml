@@ -1,0 +1,54 @@
+exe_dir: /home/russell/.local/share/Steam/steamapps/common/TrackMania United/TmForever.exe
+track_dir: /home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks
+download_track_dir: Randomizer
+game_rules:
+  time_limit: 00:10:00
+  track_limit: 10
+  next_mode: author
+track_rules:
+  # track name
+  name:
+  # track author
+  author:
+  # track pack id
+  packid:
+  # awarded by specific tm1x username
+  awardedby:
+  # commented by specific tm1x username
+  commentedby:
+  # replays driven by specific tmx UserId (must have inreplays=1)
+  replaysby:
+  # available tags: https://api2.mania.exchange/Enum/Index/28
+  tag:
+  # tags to exclude
+  etag:
+  # available types: https://api2.mania.exchange/Enum/Index/26
+  primarytype:
+  # ISO 8601
+  uploadedafter: 2010-02-01
+  uploadedbefore: 2010-02-28
+  # min/max author time in ms
+  authortimemin:
+  authortimemax: 50000
+  # available moods: https://api2.mania.exchange/Enum/Index/27
+  mood:
+  # available difficulties: https://api2.mania.exchange/Enum/Index/4
+  difficulty:
+  # 1: Only show an author's newest track (based on Uploader)
+  inlatestauthor:
+  # 1: Only show an author's most recently awarded track (based on Uploader)
+  inlatestawardedauthor:
+  # 0: Only non-Supporter tracks 1: Only MX-Supporter tracks
+  insupporter:
+  # Filter by replaysby with 1 or exclude with 0
+  inreplays:
+  # 1: Track has at least one record
+  inhasrecord: 0
+  # 1: environment != car
+  inenvmix:
+  # 1: Track requires to be played with TMUnlimiter, 0: vanilla game
+  inunlimiter:
+  # available versions: https://api2.mania.exchange/Enum/Index/33
+  unlimiterver:
+  # 1: Author time has been beaten by any player, 0: Author time has not been beaten yet (excluding unbeatable maps)
+  inauthortimebeaten:
