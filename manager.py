@@ -1,8 +1,7 @@
 import datetime
 from multiprocessing import Pool
 import os
-from pygbx2 import get_uid, get_medal
-from queue import Queue
+from pygbx2 import get_uid, get_replay_time, get_medal, get_medal_time
 import requests
 from sessions import get_todays_tracks, save_todays_tracks
 import subprocess
@@ -19,11 +18,8 @@ class Handler(PatternMatchingEventHandler):
             self, patterns=["*.gbx"], ignore_directories=True, case_sensitive=False
         )
 
-    def on_created(self, event):
-        autosave_queue.put(event.src_path)
-
     def on_modified(self, event):
-        autosave_queue.put(event.src_path)
+        new_autosave(event.src_path)
 
 
 def load_config(path):
@@ -41,6 +37,7 @@ def get_ids():
             params[f"{param}"] = value
 
     ids = set()
+    banned_ids = set(config["banned_tracks"])
     current_last = 0
 
     while True:
@@ -55,7 +52,8 @@ def get_ids():
                 break
 
             for track in results:
-                ids.add((track["TrackId"], track["UId"]))
+                if track["TrackId"] not in banned_ids:
+                    ids.add((track["TrackId"], track["UId"]))
 
             if not data.get("More", False):
                 break
@@ -71,7 +69,6 @@ def get_ids():
 
 
 def load_track(track_path):
-    # print(f"Playing {current_track}")
     command = [
         "protontricks-launch",
         "--appid",
@@ -95,7 +92,6 @@ def download_track(track_id):
     file_path = os.path.join(randomizer_dir, file_name)
 
     if os.path.exists(file_path):
-        # print(f"Map {file_name} already exists. Skipping download.")
         return file_path
 
     retries = 0
@@ -116,11 +112,11 @@ def download_track(track_id):
             print(f"Retry {retries + 1}/3 failed for map ID {track_id}: {e}")
             retries += 1
             sleep(1)
+    return None
 
 
-def add_to_next_queue():
-    global unplayed, max_time
-    while next_queue.empty():
+def add_to_next():
+    while len(next) == 0:
         try:
             track_id, track_uid = unplayed.pop()
         except KeyError:
@@ -128,37 +124,46 @@ def add_to_next_queue():
             quit()
 
         if track_uid in autosaves:
-            # print(f"{track_id} has an autosave")
             continue
 
         track_path = download_track(track_id)
-        next_queue.put(track_path)
-        # print(f"added {track_id} to next_queue")
+        if track_path is not None:
+            next.append(track_path)
 
 
-def main():
+def new_autosave(replay):
     global current_track
-    if not autosave_queue.empty():
-        replay = autosave_queue.get()
-        if get_uid(current_track) == get_uid(replay):
-            if get_medal(replay, current_track) != config["game_rules"]["next_mode"]:
-                # print("not quite fast enough")
-                return
-            replay_queue.put((replay, current_track))
-            # print(f"{os.path.split(current_track)[1]} was just finished")
-            current_track = next_queue.get()
-            load_track(current_track)
-            add_to_next_queue()
+    print("yay new autosave real")
+    replay_uid = get_uid(replay)
 
-    if not replay_queue.empty():
-        replay, track = replay_queue.get()
-        medal = get_medal(replay, track)
-        # if medal:
-        # print(f"You got the {medal} medal!")
-        # else:
-        # print("You didn't get any medal :(")
-        finished.append(medal)
-        # print(f"You've completed {len(finished)} tracks so far.")
+    if get_uid(current_track) != replay_uid:
+        return
+
+    replay_time = get_replay_time(replay)
+    target_time = get_medal_time(current_track, config["game_rules"]["next_mode"])
+    print(replay_time, target_time)
+    if not replay_time or not target_time:
+        print("couldn't get replay_time or target_time")
+        quit()
+    if replay_time > target_time:
+        return
+
+    finished.append(get_medal(replay, current_track))
+    current_track = next.pop(0)
+    load_track(current_track)
+    add_to_next()
+    autosaves.add(replay_uid)
+
+
+def status():
+    track = os.path.split(current_track)[1]
+    tracks_played = len(finished)
+    tracks_left = track_limit - tracks_played
+    time_left = stop_time - datetime.datetime.now()
+    print(
+        f"Playing {track} | Tracks Played: {tracks_played} | Tracks Left: {tracks_left} | Time Left: {time_left}",
+        end="\r",
+    )
 
 
 if __name__ == "__main__":
@@ -169,9 +174,7 @@ if __name__ == "__main__":
     randomizer_dir = f"{track_dir}/Challenges/{config['download_track_dir']}"
     sessions_path = "sessions.json"
 
-    autosave_queue = Queue()
-    next_queue = Queue()
-    replay_queue = Queue()
+    next = []
     event_handler = Handler()
     observer = Observer()
     observer.schedule(event_handler, path=autosave_dir, recursive=False)
@@ -193,10 +196,10 @@ if __name__ == "__main__":
         print("No tracks found")
 
     # start playing first track
-    add_to_next_queue()
-    current_track = next_queue.get()
+    add_to_next()
+    current_track = next.pop(0)
     load_track(current_track)
-    add_to_next_queue()
+    add_to_next()
 
     # set up for time limit
     now = datetime.datetime.now()
@@ -214,22 +217,13 @@ if __name__ == "__main__":
 
     try:
         while not enough_tracks and not enough_time:
-            main()
             enough_tracks = len(finished) >= track_limit
             enough_time = datetime.datetime.now() >= stop_time
-            track = os.path.split(current_track)[1]
-            tracks_played = len(finished)
-            tracks_left = track_limit - tracks_played
-            time_left = stop_time - datetime.datetime.now()
-            print(
-                f"Playing {track} | Tracks Played: {tracks_played} | Tracks Left: {tracks_left} | Time Left: {time_left}",
-                end="\r",
-            )
-            sleep(0.1)
+            status()
+            sleep(1)
     except KeyboardInterrupt:
         pass
 
-    print(finished)
     save_todays_tracks(sessions_path, finished)
     observer.stop()
     observer.join()
