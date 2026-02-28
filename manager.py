@@ -30,7 +30,7 @@ def load_config(path):
 
 def get_ids():
     api_url = "https://tmnf.exchange/api/tracks?"
-    params = {"fields": "TrackId,UId", "count": 1000}
+    params = {"fields": "TrackId,UId,TrackName", "count": 1000}
     for param in config["track_rules"]:
         value = config["track_rules"][f"{param}"]
         if value is not None:
@@ -53,7 +53,7 @@ def get_ids():
 
             for track in results:
                 if track["TrackId"] not in banned_ids:
-                    ids.add((track["TrackId"], track["UId"]))
+                    ids.add((track["TrackId"], track["UId"], track["TrackName"]))
 
             if not data.get("More", False):
                 break
@@ -85,10 +85,10 @@ def load_track(track_path):
         print(f"Error launching game: {e}")
 
 
-def download_track(track_id):
+def download_track(track_id, track_name):
     download_url = f"https://tmnf.exchange/trackgbx/{track_id}"
 
-    file_name = f"{track_id}.Challenge.Gbx"
+    file_name = f"{track_name}.Challenge.Gbx"
     file_path = os.path.join(randomizer_dir, file_name)
 
     if os.path.exists(file_path):
@@ -118,7 +118,7 @@ def download_track(track_id):
 def add_to_next():
     while len(next) == 0:
         try:
-            track_id, track_uid = unplayed.pop()
+            track_id, track_uid, track_name = unplayed.pop()
         except KeyError:
             print("No tracks remaining")
             quit()
@@ -126,14 +126,13 @@ def add_to_next():
         if track_uid in autosaves:
             continue
 
-        track_path = download_track(track_id)
+        track_path = download_track(track_id, track_name)
         if track_path is not None:
             next.append(track_path)
 
 
 def new_autosave(replay):
     global current_track
-    print("yay new autosave real")
     replay_uid = get_uid(replay)
 
     if get_uid(current_track) != replay_uid:
@@ -141,10 +140,9 @@ def new_autosave(replay):
 
     replay_time = get_replay_time(replay)
     target_time = get_medal_time(current_track, config["game_rules"]["next_mode"])
-    print(replay_time, target_time)
     if not replay_time or not target_time:
         print("couldn't get replay_time or target_time")
-        quit()
+        return
     if replay_time > target_time:
         return
 
@@ -156,7 +154,7 @@ def new_autosave(replay):
 
 
 def status():
-    track = os.path.split(current_track)[1]
+    track = os.path.split(current_track)[1][:13]
     tracks_played = len(finished)
     tracks_left = track_limit - tracks_played
     time_left = stop_time - datetime.datetime.now()
