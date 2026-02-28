@@ -153,11 +153,18 @@ def new_autosave(replay):
     autosaves.add(replay_uid)
 
 
+def format_timedelta(td):
+    hours, remainder = divmod(td.seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    seconds += td.microseconds / 1e6
+    return f"{hours:02d}:{minutes:02d}:{int(seconds):02d}"
+
+
 def status():
-    track = os.path.split(current_track)[1][:13]
+    track = os.path.split(current_track)[1][:-14]
     tracks_played = len(finished)
     tracks_left = track_limit - tracks_played
-    time_left = stop_time - datetime.datetime.now()
+    time_left = format_timedelta(stop_time - datetime.datetime.now())
     print(
         f"Playing {track} | Tracks Played: {tracks_played} | Tracks Left: {tracks_left} | Time Left: {time_left}",
         end="\r",
@@ -210,15 +217,15 @@ if __name__ == "__main__":
     stop_time = now + delta
 
     track_limit = int(config["game_rules"]["track_limit"])
-    enough_tracks = len(finished) >= track_limit
-    enough_time = datetime.datetime.now() >= stop_time
 
     try:
-        while not enough_tracks and not enough_time:
+        while True:
+            status()
             enough_tracks = len(finished) >= track_limit
             enough_time = datetime.datetime.now() >= stop_time
-            status()
-            sleep(1)
+            if enough_tracks or enough_time:
+                break
+            sleep(0.1)
     except KeyboardInterrupt:
         pass
 
