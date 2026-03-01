@@ -115,24 +115,24 @@ def download_track(track_id, track_name):
     return None
 
 
-def add_to_next():
-    while len(next) == 0:
+def get_next_track():
+    while True:
         try:
             track_id, track_uid, track_name = unplayed.pop()
         except KeyError:
-            print("No tracks remaining")
-            quit()
+            print("\nNo tracks remaining")
+            raise SystemExit
 
         if track_uid in autosaves:
             continue
 
         track_path = download_track(track_id, track_name)
         if track_path is not None:
-            next.append(track_path)
+            return track_path
 
 
 def new_autosave(replay):
-    global current_track
+    global current_track, current_medal, next
     replay_uid = get_uid(replay)
 
     if get_uid(current_track) != replay_uid:
@@ -141,9 +141,10 @@ def new_autosave(replay):
     replay_time = get_replay_time(replay)
     target_time = get_medal_time(current_track, config["game_rules"]["next_mode"])
     if not replay_time or not target_time:
-        print("couldn't get replay_time or target_time")
-        return
+        print("\ncouldn't get replay_time or target_time")
+        raise SystemExit
     if replay_time > target_time:
+        current_medal = get_medal(replay, current_track)
         return
 
     finished.append(get_medal(replay, current_track))
@@ -160,21 +161,25 @@ def format_timedelta(td):
 
 
 def status():
+    global current_medal
     track = os.path.split(current_track)[1][:-14]
     tracks_played = len(finished)
     tracks_left = track_limit - tracks_played
     time_left = format_timedelta(stop_time - datetime.datetime.now())
+    if not current_medal:
+        current_medal = "None"
     print(
-        f"Playing {track} | Tracks Played: {tracks_played} | Tracks Left: {tracks_left} | Time Left: {time_left}",
+        f"Tracks Played: {tracks_played} | Tracks Left: {tracks_left} | Time Left: {time_left} | Current Medal: {current_medal.capitalize()} | Current Track: {track}",
         end="\r",
     )
 
 
 def next_track():
-    global current_track
-    current_track = next.pop(0)
-    load_track(current_track)
-    add_to_next()
+    global current_track, next, current_medal
+    load_track(next)
+    current_track = next
+    next = get_next_track()
+    current_medal = ""
 
 
 if __name__ == "__main__":
@@ -182,15 +187,16 @@ if __name__ == "__main__":
 
     track_dir = config["track_dir"]
     autosave_dir = f"{track_dir}/Replays/Autosaves"
-    randomizer_dir = f"{track_dir}/Challenges/{config['download_track_dir']}"
+    randomizer_dir = f"{track_dir}/Challenges/Randomizer"
     sessions_path = "sessions.json"
 
-    next = []
+    # start observer for autosave updates
     event_handler = Handler()
     observer = Observer()
     observer.schedule(event_handler, path=autosave_dir, recursive=False)
     observer.start()
 
+    # get tracks that have been played today
     finished = get_todays_tracks(sessions_path)
     if len(finished) >= config["game_rules"]["track_limit"]:
         print("Already achieved track limit")
@@ -207,7 +213,7 @@ if __name__ == "__main__":
         print("No tracks found")
 
     # start playing first track
-    add_to_next()
+    next = get_next_track()
     next_track()
 
     # set up for time limit
@@ -219,7 +225,6 @@ if __name__ == "__main__":
         seconds=int(time_limit[6:]),
     )
     stop_time = now + delta
-
     track_limit = int(config["game_rules"]["track_limit"])
 
     while True:
@@ -242,4 +247,3 @@ if __name__ == "__main__":
     save_todays_tracks(sessions_path, finished)
     observer.stop()
     observer.join()
-    print()
