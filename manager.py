@@ -147,9 +147,7 @@ def new_autosave(replay):
         return
 
     finished.append(get_medal(replay, current_track))
-    current_track = next.pop(0)
-    load_track(current_track)
-    add_to_next()
+    next_track()
     autosaves.add(replay_uid)
 
 
@@ -170,6 +168,13 @@ def status():
         f"Playing {track} | Tracks Played: {tracks_played} | Tracks Left: {tracks_left} | Time Left: {time_left}",
         end="\r",
     )
+
+
+def next_track():
+    global current_track
+    current_track = next.pop(0)
+    load_track(current_track)
+    add_to_next()
 
 
 if __name__ == "__main__":
@@ -203,9 +208,7 @@ if __name__ == "__main__":
 
     # start playing first track
     add_to_next()
-    current_track = next.pop(0)
-    load_track(current_track)
-    add_to_next()
+    next_track()
 
     # set up for time limit
     now = datetime.datetime.now()
@@ -219,17 +222,24 @@ if __name__ == "__main__":
 
     track_limit = int(config["game_rules"]["track_limit"])
 
-    try:
-        while True:
+    while True:
+        try:
             status()
             enough_tracks = len(finished) >= track_limit
             enough_time = datetime.datetime.now() >= stop_time
             if enough_tracks or enough_time:
                 break
             sleep(0.1)
-    except KeyboardInterrupt:
-        pass
+        except KeyboardInterrupt:
+            choice = input("\na) Skip b) Reload c) Quit >> ")
+            if choice == "a":
+                next_track()
+            elif choice == "b":
+                load_track(current_track)
+            elif choice == "c":
+                break
 
     save_todays_tracks(sessions_path, finished)
     observer.stop()
     observer.join()
+    print()
