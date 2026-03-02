@@ -170,11 +170,11 @@ def status():
     track = os.path.split(current_track)[1][:-14]
     tracks_played = len(finished)
     stat_tracks_left = ""
-    if limit_tracks:
+    if track_limit:
         tracks_left = track_limit - tracks_played
         stat_tracks_left = f"Tracks Left: {tracks_left} | "
     stat_time_left = ""
-    if limit_time:
+    if stop_time:
         time_left = format_timedelta(stop_time - datetime.datetime.now())
         stat_time_left = f"Time Left: {time_left} | "
     if not current_medal:
@@ -187,6 +187,7 @@ def status():
 
 def next_track():
     global current_track, next, current_medal
+    time.sleep(0.1)  # maybe fix for tracks not loading?
     load_track(next)
     current_track = next
     next = get_next_track()
@@ -230,36 +231,31 @@ if __name__ == "__main__":
     next = get_next_track()
     next_track()
 
-    # set up for time limit
-    limit_time = True
-    time_limit = config["game_rules"]["time_limit"]
-    print(time_limit)
-    now = datetime.datetime.now()
-    if time_limit:
-        delta = datetime.timedelta(seconds=time_limit)
-        stop_time = now + delta
-    else:
-        limit_time = False
-
-    # set up for track limit
-    limit_tracks = True
+    # set up for time and track limit
     track_limit = config["game_rules"]["track_limit"]
-    if track_limit is None:
-        limit_tracks = False
+    if track_limit:
+        track_limit = int(track_limit)
+
+    time_limit = config["game_rules"]["time_limit"]
+    stop_time = None
+    if isinstance(time_limit, int):
+        stop_time = datetime.datetime.now() + datetime.timedelta(seconds=time_limit)
+    elif isinstance(time_limit, str):
+        dt = datetime.timedelta(
+            hours=int(time_limit[:2]),
+            minutes=int(time_limit[3:5]),
+            seconds=int(time_limit[6:]),
+        )
+        stop_time = datetime.datetime.now() + dt
 
     finished = []
     while True:
         try:
-            if limit_tracks:
-                enough_tracks = len(finished) >= int(track_limit)
-            else:
-                enough_tracks = False
-            if limit_time:
-                enough_time = datetime.datetime.now() >= stop_time
-            else:
-                enough_time = False
-
-            if enough_tracks or enough_time:
+            if track_limit and len(finished) >= track_limit:
+                print("Track limit reached")
+                break
+            if stop_time and datetime.datetime.now() >= stop_time:
+                print("Time limit reached")
                 break
 
             status()
