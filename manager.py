@@ -5,7 +5,7 @@ import os
 from pygbx2 import get_uid, get_replay_time, get_medal, get_medal_time
 import requests
 import subprocess
-from time import sleep
+import time
 from watchdog.events import PatternMatchingEventHandler
 from watchdog.observers import Observer
 import yaml
@@ -52,7 +52,7 @@ def get_ids():
                 break
 
             for track in results:
-                if track["TrackId"] not in banned_ids:
+                if track["TrackId"] not in banned_ids and track["UId"] not in autosaves:
                     ids.add((track["TrackId"], track["UId"], track["TrackName"]))
 
             if not data.get("More", False):
@@ -62,7 +62,7 @@ def get_ids():
 
         except requests.exceptions.RequestException as e:
             print(f"error: {e}")
-            sleep(1)
+            time.sleep(1)
             continue
 
     return ids
@@ -107,27 +107,29 @@ def download_track(track_id, track_name):
                     f"Failed to download map ID {track_id}, status code: {map_response.status_code}"
                 )
             retries += 1
-            sleep(1)
+            time.sleep(1)
         except requests.RequestException as e:
-            print(f"Retry {retries + 1}/3 failed for map ID {track_id}: {e}")
+            print(f"Retry {retries + 1}/3 failed for track ID {track_id}: {e}")
             retries += 1
-            sleep(1)
+            time.sleep(1)
     return None
 
 
 def get_next_track():
     while True:
         try:
-            track_id, track_uid, track_name = unplayed.pop()
+            track_id, track_uid, track_name = unplayed_tracks.pop()
         except KeyError:
             print("\nNo tracks remaining")
             raise SystemExit
 
+        # don't need?
         if track_uid in autosaves:
             continue
 
         track_path = download_track(track_id, track_name)
         if track_path is not None:
+            print(track_path)
             return track_path
 
 
@@ -167,12 +169,18 @@ def status():
     global current_medal
     track = os.path.split(current_track)[1][:-14]
     tracks_played = len(finished)
-    tracks_left = track_limit - tracks_played
-    time_left = format_timedelta(stop_time - datetime.datetime.now())
+    stat_tracks_left = ""
+    if limit_tracks:
+        tracks_left = track_limit - tracks_played
+        stat_tracks_left = f"Tracks Left: {tracks_left} | "
+    stat_time_left = ""
+    if limit_time:
+        time_left = format_timedelta(stop_time - datetime.datetime.now())
+        stat_time_left = f"Time Left: {time_left} | "
     if not current_medal:
         current_medal = "None"
     print(
-        f"Tracks Played: {tracks_played} | Tracks Left: {tracks_left} | Time Left: {time_left} | Current Medal: {current_medal.capitalize()} | Current Track: {track}",
+        f"Tracks Played: {tracks_played} | {stat_tracks_left}{stat_time_left}Current Medal: {current_medal.capitalize()} | Current Track: {track}",
         end="\r",
     )
 
@@ -185,12 +193,12 @@ def next_track():
     current_medal = ""
 
 
-def save_todays_tracks(finished):
+def save_session(data):
     now = datetime.datetime.now()
     timestamp = f"{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}"
     os.mkdir(f"sessions/{timestamp}")
     with open(f"sessions/{timestamp}/session.json", "w") as file:
-        json.dump(finished, file, indent=2)
+        json.dump(data, file, indent=2)
 
 
 if __name__ == "__main__":
@@ -213,37 +221,49 @@ if __name__ == "__main__":
         autosaves = set(pool.imap(get_uid, files))
 
     # get set of available track ids
-    unplayed = get_ids()
-    if not unplayed:
+    unplayed_tracks = get_ids()
+    if not unplayed_tracks:
         print("No tracks found")
+        raise SystemExit
 
     # start playing first track
     next = get_next_track()
     next_track()
 
     # set up for time limit
+    limit_time = True
     time_limit = config["game_rules"]["time_limit"]
+    print(time_limit)
     now = datetime.datetime.now()
     if time_limit:
-        delta = datetime.timedelta(
-            hours=int(time_limit[:2]),
-            minutes=int(time_limit[3:5]),
-            seconds=int(time_limit[6:]),
-        )
+        delta = datetime.timedelta(seconds=time_limit)
         stop_time = now + delta
     else:
-        stop_time = now + datetime.timedelta(days=100)
-    track_limit = int(config["game_rules"]["track_limit"])
-    finished = []
+        limit_time = False
 
+    # set up for track limit
+    limit_tracks = True
+    track_limit = config["game_rules"]["track_limit"]
+    if track_limit is None:
+        limit_tracks = False
+
+    finished = []
     while True:
         try:
-            status()
-            enough_tracks = len(finished) >= track_limit
-            enough_time = datetime.datetime.now() >= stop_time
+            if limit_tracks:
+                enough_tracks = len(finished) >= int(track_limit)
+            else:
+                enough_tracks = False
+            if limit_time:
+                enough_time = datetime.datetime.now() >= stop_time
+            else:
+                enough_time = False
+
             if enough_tracks or enough_time:
                 break
-            sleep(0.1)
+
+            status()
+            time.sleep(0.1)
         except KeyboardInterrupt:
             choice = input("\na) Skip b) Reload c) Quit >> ")
             if choice == "a":
@@ -253,6 +273,6 @@ if __name__ == "__main__":
             elif choice == "c":
                 break
 
-    save_todays_tracks(finished)
+    save_session(finished)
     observer.stop()
     observer.join()
