@@ -1,4 +1,3 @@
 __pycache__/*
+sessions/*
 venv/*
-ids.txt
-sessions.json

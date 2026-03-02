@@ -1,9 +1,9 @@
 import datetime
+import json
 from multiprocessing import Pool
 import os
 from pygbx2 import get_uid, get_replay_time, get_medal, get_medal_time
 import requests
-from sessions import get_todays_tracks, save_todays_tracks
 import subprocess
 from time import sleep
 from watchdog.events import PatternMatchingEventHandler
@@ -138,16 +138,19 @@ def new_autosave(replay):
     if get_uid(current_track) != replay_uid:
         return
 
-    replay_time = get_replay_time(replay)
-    target_time = get_medal_time(current_track, config["game_rules"]["next_mode"])
-    if not replay_time or not target_time:
-        print("\ncouldn't get replay_time or target_time")
-        raise SystemExit
-    if replay_time > target_time:
-        current_medal = get_medal(replay, current_track)
-        return
+    if config["game_rules"]["next_mode"] != "finished":
+        replay_time = get_replay_time(replay)
+        target_time = get_medal_time(current_track, config["game_rules"]["next_mode"])
+        if not replay_time or not target_time:
+            print("\ncouldn't get replay_time or target_time")
+            raise SystemExit
+        if replay_time > target_time:
+            current_medal = get_medal(replay, current_track)
+            return
 
-    finished.append(get_medal(replay, current_track))
+    now = datetime.datetime.now()
+    timestamp = f"{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}"
+    finished.append([get_medal(replay, current_track), replay_uid, timestamp])
     next_track()
     autosaves.add(replay_uid)
 
@@ -182,6 +185,14 @@ def next_track():
     current_medal = ""
 
 
+def save_todays_tracks(finished):
+    now = datetime.datetime.now()
+    timestamp = f"{now.year}-{now.month}-{now.day}_{now.hour}-{now.minute}-{now.second}"
+    os.mkdir(f"sessions/{timestamp}")
+    with open(f"sessions/{timestamp}/session.json", "w") as file:
+        json.dump(finished, file, indent=2)
+
+
 if __name__ == "__main__":
     config = load_config("config.yaml")
 
@@ -195,12 +206,6 @@ if __name__ == "__main__":
     observer = Observer()
     observer.schedule(event_handler, path=autosave_dir, recursive=False)
     observer.start()
-
-    # get tracks that have been played today
-    finished = get_todays_tracks(sessions_path)
-    if len(finished) >= config["game_rules"]["track_limit"]:
-        print("Already achieved track limit")
-        quit()
 
     # get set of uid's for autosaves
     files = [entry.path for entry in os.scandir(autosave_dir) if entry.is_file()]
@@ -217,15 +222,19 @@ if __name__ == "__main__":
     next_track()
 
     # set up for time limit
-    now = datetime.datetime.now()
     time_limit = config["game_rules"]["time_limit"]
-    delta = datetime.timedelta(
-        hours=int(time_limit[:2]),
-        minutes=int(time_limit[3:5]),
-        seconds=int(time_limit[6:]),
-    )
-    stop_time = now + delta
+    now = datetime.datetime.now()
+    if time_limit:
+        delta = datetime.timedelta(
+            hours=int(time_limit[:2]),
+            minutes=int(time_limit[3:5]),
+            seconds=int(time_limit[6:]),
+        )
+        stop_time = now + delta
+    else:
+        stop_time = now + datetime.timedelta(days=100)
     track_limit = int(config["game_rules"]["track_limit"])
+    finished = []
 
     while True:
         try:
@@ -244,6 +253,6 @@ if __name__ == "__main__":
             elif choice == "c":
                 break
 
-    save_todays_tracks(sessions_path, finished)
+    save_todays_tracks(finished)
     observer.stop()
     observer.join()
