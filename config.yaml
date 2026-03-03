@@ -31,10 +31,10 @@ track_rules:
   primarytype:
   # ISO 8601 (YYYY-MM-DD)
   uploadedafter: 2010-02-01
-  uploadedbefore: 2010-02-28
+  uploadedbefore: 2010-09-28
   # min/max author time in ms
   authortimemin:
-  authortimemax: 50000
+  authortimemax: 25000
   # available moods: https://api2.mania.exchange/Enum/Index/27
   mood:
   # available difficulties: https://api2.mania.exchange/Enum/Index/4
@@ -52,7 +52,7 @@ track_rules:
   # 1: environment != car
   inenvmix:
   # 1: Track requires to be played with TMUnlimiter, 0: vanilla game
-  inunlimiter:
+  inunlimiter: 0
   # available versions: https://api2.mania.exchange/Enum/Index/33
   unlimiterver:
   # 1: Author time has been beaten by any player, 0: Author time has not been beaten yet (excluding unbeatable maps)

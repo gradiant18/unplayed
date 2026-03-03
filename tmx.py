@@ -32,7 +32,8 @@ def get_tracks(track_rules, site, banned_tracks):
             for track in results:
                 if track["TrackId"] in banned_tracks:
                     continue
-                ids.add((track["TrackId"], track["UId"], track["TrackName"]))
+                track_name = track["TrackName"].strip("/\\'\"")
+                ids.add((track["TrackId"], track["UId"], track_name))
 
             if not data.get("More", False):
                 break
@@ -47,7 +48,17 @@ def get_tracks(track_rules, site, banned_tracks):
     return ids
 
 
-def download_track(site, track_id, file_path):
+def download_track(track_dir, site, track_id):
+    dirs = {
+        "tmnf.exchange": "TMNF-X",
+        "tmuf.exchange": "TMUF-X",
+        "original.tm-exchange.com": "TMO-X",
+        "sunrise.tm-exchange.com": "TMS-X",
+        "nations.tm-exchnage.com": "TMN-X",
+    }
+    if not os.path.exists(dir_path := os.path.join(track_dir, dirs[site])):
+        os.mkdir(dir_path)
+    file_path = os.path.join(dir_path, f"{track_id}.Challenge.gbx")
     if os.path.exists(file_path):
         return file_path
 
@@ -77,13 +88,13 @@ def load_track_in_game(exe_path, track_path):
         "protontricks-launch",
         "--appid",
         "7200",
-        os.path.abspath(exe_path),
+        exe_path,
         "/useexedir",
         "/singleinst",
-        f"/file={os.path.abspath(track_path)}",
+        f"/file={track_path}",
     ]
 
     try:
-        subprocess.run(command, check=True)
+        subprocess.run(command)
     except subprocess.CalledProcessError as e:
         print(f"Error launching game: {e}")
