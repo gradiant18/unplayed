@@ -1,13 +1,15 @@
-exe_dir: /home/russell/.local/share/Steam/steamapps/common/TrackMania
+exe_path: /home/russell/.local/share/Steam/steamapps/common/TrackMania
   United/TmForever.exe
 track_dir: /home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks
 game_rules:
   # HH:MM:SS (can be empty)
   time_limit: 00:10:00
   # int (can be empty)
-  track_limit:
+  track_limit: 5
   # author, gold, silver, bronze, finished
   next_mode: author
+  # TMUF-X, TMNF-X, TMO-X, TMS-X, TMN-X
+  site: TMNF-X
 track_rules:
   # track name
   name:
