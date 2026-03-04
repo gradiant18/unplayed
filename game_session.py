@@ -5,6 +5,18 @@ import os
 from pygbx2 import get_uid, get_replay_time, get_medal, get_medal_time
 import time
 from tmx import load_track_in_game, download_track, get_tracks
+import functools
+
+
+@functools.total_ordering
+class NeverSmaller:
+    def __gt__(self, other):
+        return False
+
+
+class ReallyMaxInt(NeverSmaller, int):
+    def __repr__(self):
+        return "ReallyMaxInt()"
 
 
 class GameSession:
@@ -18,7 +30,7 @@ class GameSession:
         self.unplayed_tracks = get_tracks(
             self.config["track_rules"],
             self.site,
-            self.config["track_rules"].get("banned_tracks"),
+            self.config["banned_tracks"].get(self.config["game_rules"]["site"]),
         )
 
         self.current_track = None
@@ -30,6 +42,7 @@ class GameSession:
         self.stop_time = self._calculate_stop_time()
         self.track_limit = self.config["game_rules"].get("track_limit")
         self.track_name = None
+        self.next_track_name = None
 
     def _get_site(self):
         sites = {
@@ -71,9 +84,10 @@ class GameSession:
     def _get_downloaded_track(self):
         while True:
             try:
-                track_id, track_uid, self.track_name = self.unplayed_tracks.pop()
+                track_id, track_uid, self.next_track_name = self.unplayed_tracks.pop()
             except KeyError:
-                return 0
+                print("No more tracks")
+                return "Stop"
 
             if track_uid in self.autosaves:
                 continue
@@ -85,21 +99,27 @@ class GameSession:
     def load_next(self):
         if not self.next_track:
             self.next_track = self._get_downloaded_track()
+        if self.next_track == "Stop":
+            self.stop_time = datetime.now()
+            return
 
-        start = time.perf_counter()
         load_track_in_game(self.config["exe_path"], self.next_track)
-        print(f"\nTook {time.perf_counter() - start}s to load_track_in_game")
 
-        start = time.perf_counter()
+        print(self.next_track)
         self.current_track = self.next_track
         self.current_medal = "None"
         self.current_uid = get_uid(self.current_track)
-        self.next_track = self._get_downloaded_track()
-        self.target_time = get_medal_time(self.current_track, self.mode)
-        print(f"\nTook {time.perf_counter() - start}s to set vars")
+        self.track_name = self.next_track_name
+        if self.mode != "finished":
+            self.target_time = get_medal_time(self.current_track, self.mode)
+        else:
+            self.target_time = ReallyMaxInt()
+        if len(self.unplayed_tracks) >= 1:
+            self.next_track = self._get_downloaded_track()
+        else:
+            self.next_track = "Stop"
 
     def record_autosave(self, replay_path):
-        print("\nran record_autosave")
         replay_uid = get_uid(replay_path)
         if self.current_uid != replay_uid:
             return

@@ -19,19 +19,14 @@ if __name__ == "__main__":
     with open("config.yaml") as file:
         config = yaml.safe_load(file)
 
-    start = time.perf_counter()
     session = GameSession(config)
-    print(f"\nTook {time.perf_counter() - start}s to create GameSession")
 
     observer = Observer()
     observer.schedule(Handler(session), path=session.autosave_dir, recursive=False)
     observer.start()
 
-    start = time.perf_counter()
     session.load_next()
-    print(f"\nTook {time.perf_counter() - start}s to load next")
 
-    not_working = []
     while True:
         try:
             if session.track_limit and len(session.finished) >= session.track_limit:
@@ -39,7 +34,7 @@ if __name__ == "__main__":
             if session.stop_time and datetime.datetime.now() >= session.stop_time:
                 break
 
-            print(session, end="\r")
+            session.status()
             time.sleep(0.1)
         except KeyboardInterrupt:
             choice = input("\na) Skip b) Reload c) Quit >> ")
@@ -50,9 +45,6 @@ if __name__ == "__main__":
             elif choice == "c":
                 session.save()
                 break
-            elif choice == "d":
-                not_working.append((session.current_track, session.current_uid))
 
     observer.stop()
     observer.join()
-    print("\n", not_working)

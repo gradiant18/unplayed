@@ -30,7 +30,7 @@ def get_tracks(track_rules, site, banned_tracks):
                 break
 
             for track in results:
-                if track["TrackId"] in banned_tracks:
+                if str(track["TrackId"]) in banned_tracks:
                     continue
                 track_name = track["TrackName"].strip("/\\'\"")
                 ids.add((track["TrackId"], track["UId"], track_name))
@@ -56,7 +56,8 @@ def download_track(track_dir, site, track_id):
         "sunrise.tm-exchange.com": "TMS-X",
         "nations.tm-exchnage.com": "TMN-X",
     }
-    if not os.path.exists(dir_path := os.path.join(track_dir, dirs[site])):
+    dir_path = os.path.join(track_dir, dirs[site])
+    if not os.path.exists(dir_path):
         os.mkdir(dir_path)
     file_path = os.path.join(dir_path, f"{track_id}.Challenge.gbx")
     if os.path.exists(file_path):
