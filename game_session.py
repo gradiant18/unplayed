@@ -2,57 +2,59 @@ from datetime import datetime, timedelta
 import json
 from multiprocessing import Pool
 import os
-from pygbx2 import get_uid, get_replay_time, get_medal, get_medal_time
+from pygbx2 import get_uid, get_replay_time, get_medal_times
 import time
 from tmx import load_track_in_game, download_track, get_tracks
-import functools
 
 
-@functools.total_ordering
-class NeverSmaller:
-    def __gt__(self, other):
-        return False
+class Track:
+    def __init__(self):
+        self.path = ""
+        self.uid = None
+        self.name = None
+        self.medal = None
+        self.medals = None
 
+    def update_medal(self, replay_path):
+        replay_time = get_replay_time(replay_path)
 
-class ReallyMaxInt(NeverSmaller, int):
-    def __repr__(self):
-        return "ReallyMaxInt()"
+        if not self.medals:
+            self.medals = get_medal_times(self.path)
+
+        for medal in self.medals:
+            if replay_time <= self.medals[medal]:
+                self.medal = medal
+                return
+
+    def update_medals(self):
+        self.medals = get_medal_times(self.path)
+
+    def __str__(self):
+        return f"{self.name = }, {self.path = }, {self.uid = }, {self.medal = }, {self.medals = }"
 
 
 class GameSession:
     def __init__(self, config):
         self.config = config
-        self.mode = self.config["game_rules"].get("next_mode")
+
+        self.mode = config["game_rules"].get("next_mode", "author")
+        self.site = config["game_rules"].get("site", "TMNF-X")
+        self.site_url = self._get_site_url()
+
         self.finished = []
         self.autosave_dir = f"{self.config['track_dir']}/Replays/Autosaves"
         self.autosaves = self._get_autosaves()
-        self.site = self._get_site()
         self.unplayed_tracks = get_tracks(
-            self.config["track_rules"],
-            self.site,
-            self.config["banned_tracks"].get(self.config["game_rules"]["site"]),
+            config["track_rules"],
+            self.site_url,
+            set(config["banned_tracks"][self.site]),
         )
 
-        self.current_track = None
-        self.current_uid = None
-        self.next_track = None
-        self.current_medal = "None"
-        self.target_time = None
+        self.next = Track()
+
         self.start_time = datetime.now()
         self.stop_time = self._calculate_stop_time()
-        self.track_limit = self.config["game_rules"].get("track_limit")
-        self.track_name = None
-        self.next_track_name = None
-
-    def _get_site(self):
-        sites = {
-            "TMUF-X": "tmuf.exchange",
-            "TMNF-X": "tmnf.exchange",
-            "TMO-X": "original.tm-exchange.com",
-            "TMS-X": "sunrise.tm-exchange.com",
-            "TMN-X": "nations.tm-exchange.com",
-        }
-        return sites.get(self.config["game_rules"].get("site"))
+        self.track_limit = config["game_rules"].get("track_limit")
 
     def _get_autosaves(self):
         files = []
@@ -62,6 +64,16 @@ class GameSession:
         with Pool(16) as pool:
             autosaves = set(pool.imap_unordered(get_uid, files))
         return autosaves
+
+    def _get_site_url(self):
+        sites = {
+            "TMUF-X": "tmuf.exchange",
+            "TMNF-X": "tmnf.exchange",
+            "TMO-X": "original.tm-exchange.com",
+            "TMS-X": "sunrise.tm-exchange.com",
+            "TMN-X": "nations.tm-exchange.com",
+        }
+        return sites[self.site]
 
     def _calculate_stop_time(self):
         limit = self.config["game_rules"].get("time_limit")
@@ -84,57 +96,53 @@ class GameSession:
     def _get_downloaded_track(self):
         while True:
             try:
-                track_id, track_uid, self.next_track_name = self.unplayed_tracks.pop()
+                track_id, self.next.uid, self.next.name = self.unplayed_tracks.pop()
             except KeyError:
                 print("No more tracks")
-                return "Stop"
+                self.next.path = "Stop"
+                return
 
-            if track_uid in self.autosaves:
+            if self.next.uid in self.autosaves:
                 continue
 
-            track_path = download_track(self.config["track_dir"], self.site, track_id)
+            track_path = download_track(
+                self.config["track_dir"], self.site_url, track_id
+            )
             if track_path is not None:
-                return track_path
+                self.next.path = track_path
+                return
 
     def load_next(self):
-        if not self.next_track:
-            self.next_track = self._get_downloaded_track()
-        if self.next_track == "Stop":
+        if not self.next.path:
+            self._get_downloaded_track()
+        if self.next.path == "Stop":
             self.stop_time = datetime.now()
             return
 
-        load_track_in_game(self.config["exe_path"], self.next_track)
+        load_track_in_game(self.config["exe_path"], self.next.path)
 
-        print(self.next_track)
-        self.current_track = self.next_track
-        self.current_medal = "None"
-        self.current_uid = get_uid(self.current_track)
-        self.track_name = self.next_track_name
-        if self.mode != "finished":
-            self.target_time = get_medal_time(self.current_track, self.mode)
-        else:
-            self.target_time = ReallyMaxInt()
-        if len(self.unplayed_tracks) >= 1:
-            self.next_track = self._get_downloaded_track()
-        else:
-            self.next_track = "Stop"
+        self.current = self.next
+        self.current.update_medals()
+        self.next = Track()
+        self._get_downloaded_track()
 
     def record_autosave(self, replay_path):
         replay_uid = get_uid(replay_path)
-        if self.current_uid != replay_uid:
+        if self.current.uid != replay_uid:
             return
 
-        self.current_medal = get_medal(replay_path, self.current_track)
+        self.current.update_medal(replay_path)
+
         if self.mode != "finished":
             replay_time = get_replay_time(replay_path)
             if not replay_time:
                 print("\nCouldn't get replay_time")
                 raise SystemExit
-            if replay_time > self.target_time:
+            if self.current.medals and replay_time > self.current.medals[self.mode]:
                 return
 
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        self.finished.append([self.current_medal, replay_uid, timestamp])
+        self.finished.append([self.current.medal, replay_uid, timestamp])
         self.load_next()
         self.autosaves.add(replay_uid)
         self.save()
@@ -146,7 +154,7 @@ class GameSession:
 
     def reload_track(self):
         time.sleep(0.1)
-        load_track_in_game(self.config["exe_path"], self.current_track)
+        load_track_in_game(self.config["exe_path"], self.current.path)
 
     def save(self):
         if len(self.finished) == 0:
@@ -166,26 +174,21 @@ class GameSession:
             tracks_left = self.track_limit - len(self.finished)
             tracks_left = f"Tracks Left: {tracks_left} |"
 
-        # Not working
-        if not self.current_medal:
-            self.current_medal = "None"
+        current_medal = ""
+        if self.mode != "finished":
+            medal = "None"
+            if self.current.medal:
+                medal = self.current.medal.capitalize()
+            current_medal = f"Current Medal: {medal} |"
 
         print(
             f"Tracks Played: {len(self.finished)} |",
             tracks_left,
             time_left,
-            f"Current Medal: {self.current_medal.capitalize()} |",
-            f"Current Track: {self.track_name}",
+            current_medal,
+            f"Current Track: {self.current.name}",
             end="\r",
         )
 
     def __str__(self):
-        return str(
-            [
-                os.path.split(str(self.current_track))[1],
-                self.current_medal,
-                self.current_uid,
-                os.path.split(str(self.next_track))[1],
-                self.target_time,
-            ]
-        )
+        return str([self.current, self.next])

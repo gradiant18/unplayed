@@ -8,22 +8,7 @@ def get_replay_time(path):
     return ghost.race_time
 
 
-def get_medal_time(path, medal):
-    with open(path, "rb") as file:
-        data = str(file.read())
-
-    regexes = {
-        "author": r'ortime="\d+"',
-        "gold": r'" gold="\d+"',
-        "silver": r'silver="\d+"',
-        "bronze": r'bronze="\d+"',
-    }
-    if not (match := search(regexes[medal], data)):
-        return None
-    return int(match.group()[8:-1])
-
-
-def _get_all_medal_times(path):
+def get_medal_times(path):
     with open(path, "rb") as file:
         data = str(file.read())
 
@@ -36,7 +21,8 @@ def _get_all_medal_times(path):
     medals = []
     for medal in regexes:
         if not (match := search(regexes[medal], data)):
-            return None
+            medals.append(0)
+            continue
         medals.append(int(match.group()[8:-1]))
     return {
         "author": medals[0],
@@ -48,10 +34,11 @@ def _get_all_medal_times(path):
 
 def get_medal(replay_path, track_path):
     race_time = get_replay_time(replay_path)
-    medal_times = _get_all_medal_times(track_path)
+    medal_times = get_medal_times(track_path)
 
     if not race_time or not medal_times:
-        return None
+        print("Could not get race_time or medal_times")
+        raise SystemExit
 
     medal = ""
     for medal_type in medal_times:

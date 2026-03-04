@@ -34,7 +34,7 @@ track_rules:
   uploadedbefore: 2010-02-28
   # min/max author time in ms
   authortimemin:
-  authortimemax: 36000
+  authortimemax: 38000
   # available moods: https://api2.mania.exchange/Enum/Index/27
   mood:
   # available difficulties: https://api2.mania.exchange/Enum/Index/4
