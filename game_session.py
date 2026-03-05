@@ -2,59 +2,33 @@ from datetime import datetime, timedelta
 import json
 from multiprocessing import Pool
 import os
-from pygbx2 import get_uid, get_replay_time, get_medal_times
+from pygbx2 import get_uid, get_replay_time
 import time
-from tmx import load_track_in_game, download_track, get_tracks
-
-
-class Track:
-    def __init__(self):
-        self.path = ""
-        self.uid = None
-        self.name = None
-        self.medal = None
-        self.medals = None
-
-    def update_medal(self, replay_path):
-        replay_time = get_replay_time(replay_path)
-
-        if not self.medals:
-            self.medals = get_medal_times(self.path)
-
-        for medal in self.medals:
-            if replay_time <= self.medals[medal]:
-                self.medal = medal
-                return
-
-    def update_medals(self):
-        self.medals = get_medal_times(self.path)
-
-    def __str__(self):
-        return f"{self.name = }, {self.path = }, {self.uid = }, {self.medal = }, {self.medals = }"
+from tmx import load_track_in_game, get_tracks
 
 
 class GameSession:
     def __init__(self, config):
         self.config = config
 
-        self.mode = config["game_rules"].get("next_mode", "author")
-        self.site = config["game_rules"].get("site", "TMNF-X")
+        self.mode = config.get("next_mode", "author")
+        self.site = config.get("site", "TMNF-X")
         self.site_url = self._get_site_url()
 
         self.finished = []
         self.autosave_dir = f"{self.config['track_dir']}/Replays/Autosaves"
         self.autosaves = self._get_autosaves()
-        self.unplayed_tracks = get_tracks(
-            config["track_rules"],
+        self.tracks = get_tracks(
             self.site_url,
+            config["track_rules"],
             set(config["banned_tracks"][self.site]),
+            self.autosaves,
         )
-
-        self.next = Track()
 
         self.start_time = datetime.now()
         self.stop_time = self._calculate_stop_time()
-        self.track_limit = config["game_rules"].get("track_limit")
+        self.track_limit = config.get("track_limit")
+        self.stop = False
 
     def _get_autosaves(self):
         files = []
@@ -76,7 +50,7 @@ class GameSession:
         return sites[self.site]
 
     def _calculate_stop_time(self):
-        limit = self.config["game_rules"].get("time_limit")
+        limit = self.config.get("time_limit")
         if not limit:
             return None
 
@@ -93,40 +67,35 @@ class GameSession:
         seconds += td.microseconds / 1e6
         return f"{hours:02d}:{minutes:02d}:{int(seconds):02d}"
 
-    def _get_downloaded_track(self):
+    def get_next(self):
         while True:
             try:
-                track_id, self.next.uid, self.next.name = self.unplayed_tracks.pop()
+                self.next = self.tracks.pop()
             except KeyError:
                 print("No more tracks")
-                self.next.path = "Stop"
                 return
 
-            if self.next.uid in self.autosaves:
-                continue
-
-            track_path = download_track(
-                self.config["track_dir"], self.site_url, track_id
-            )
-            if track_path is not None:
-                self.next.path = track_path
+            self.next.download(self.config["track_dir"], self.site, self.site_url)
+            if self.next.path is not None:
                 return
+
+    def start(self):
+        if len(self.tracks) == 0:
+            print("No tracks")
+            raise SystemExit
+        self.next = self.tracks.pop()
+        self.load_next()
 
     def load_next(self):
         if not self.next.path:
-            self._get_downloaded_track()
-        if self.next.path == "Stop":
-            self.stop_time = datetime.now()
-            return
+            self.get_next()
 
         load_track_in_game(self.config["exe_path"], self.next.path)
 
         self.current = self.next
-        self.current.update_medals()
-        self.next = Track()
-        self._get_downloaded_track()
+        self.get_next()
 
-    def record_autosave(self, replay_path):
+    def update_session(self, replay_path):
         replay_uid = get_uid(replay_path)
         if self.current.uid != replay_uid:
             return
@@ -138,14 +107,24 @@ class GameSession:
             if not replay_time:
                 print("\nCouldn't get replay_time")
                 raise SystemExit
-            if self.current.medals and replay_time > self.current.medals[self.mode]:
+            if replay_time > self.current.medals[self.mode]:
                 return
 
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        self.finished.append([self.current.medal, replay_uid, timestamp])
-        self.load_next()
         self.autosaves.add(replay_uid)
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        info = [self.current.medal, replay_uid, timestamp]
+        if info not in self.finished:
+            self.finished.append(info)
         self.save()
+        if (
+            len(self.tracks) == 0
+            and self.track_limit
+            and len(self.finished) >= self.track_limit
+        ):
+            print("\nshould stop soon")
+            self.stop = True
+            return
+        self.load_next()
 
     def skip_track(self):
         # increase skipped track count?
@@ -157,36 +136,35 @@ class GameSession:
         load_track_in_game(self.config["exe_path"], self.current.path)
 
     def save(self):
-        if len(self.finished) == 0:
+        if len(self.finished) == 0 and not self.config["save_empty"]:
             return
         timestamp = self.start_time.strftime("%Y-%m-%d_%H-%M-%S")
         with open(f"sessions/{timestamp}.json", "w") as file:
             json.dump(self.finished, file, indent=2)
 
     def status(self):
-        time_left = ""
-        if self.stop_time:
-            time_left = self._format_timedelta(self.stop_time - datetime.now())
-            time_left = f"Time Left: {time_left} |"
+        tracks_played = f"Tracks Played: {len(self.finished)} | "
 
         tracks_left = ""
         if self.track_limit:
             tracks_left = self.track_limit - len(self.finished)
-            tracks_left = f"Tracks Left: {tracks_left} |"
+            tracks_left = f"Tracks Left: {tracks_left} | "
+
+        time_left = ""
+        if self.stop_time:
+            time_left = self._format_timedelta(self.stop_time - datetime.now())
+            time_left = f"Time Left: {time_left} | "
 
         current_medal = ""
-        if self.mode != "finished":
+        if self.mode != "finished" or "bronze":
             medal = "None"
             if self.current.medal:
                 medal = self.current.medal.capitalize()
-            current_medal = f"Current Medal: {medal} |"
+            current_medal = f"Current Medal: {medal} | "
 
+        current_track = f"Current Track: {self.current.name}"
         print(
-            f"Tracks Played: {len(self.finished)} |",
-            tracks_left,
-            time_left,
-            current_medal,
-            f"Current Track: {self.current.name}",
+            f"{tracks_played}{tracks_left}{time_left}{current_medal}{current_track}",
             end="\r",
         )
 

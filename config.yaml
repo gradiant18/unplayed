@@ -1,15 +1,16 @@
 exe_path: /home/russell/.local/share/Steam/steamapps/common/TrackMania
   United/TmForever.exe
 track_dir: /home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks
-game_rules:
-  # HH:MM:SS (can be empty)
-  time_limit:
-  # int (can be empty)
-  track_limit: 5
-  # author, gold, silver, bronze, finished
-  next_mode: author
-  # TMUF-X, TMNF-X, TMO-X, TMS-X, TMN-X
-  site: TMNF-X
+# HH:MM:SS (can be empty)
+time_limit: 00:15:00
+# int (can be empty) (all for all available tracks?)
+track_limit:
+# author, gold, silver, bronze, finished
+next_mode: author
+# TMUF-X, TMNF-X, TMO-X, TMS-X, TMN-X
+site: TMNF-X
+# whether to save empty sessions
+save_empty:
 track_rules:
   # track name
   name:
@@ -31,10 +32,10 @@ track_rules:
   primarytype:
   # ISO 8601 (YYYY-MM-DD)
   uploadedafter: 2010-02-01
-  uploadedbefore: 2010-02-28
+  uploadedbefore: 2010-09-28
   # min/max author time in ms
   authortimemin:
-  authortimemax: 38000
+  authortimemax: 25000
   # available moods: https://api2.mania.exchange/Enum/Index/27
   mood:
   # available difficulties: https://api2.mania.exchange/Enum/Index/4

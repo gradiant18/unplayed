@@ -12,7 +12,7 @@ class Handler(PatternMatchingEventHandler):
         self.session = session
 
     def on_modified(self, event):
-        self.session.record_autosave(event.src_path)
+        self.session.update_session(event.src_path)
 
 
 if __name__ == "__main__":
@@ -25,13 +25,13 @@ if __name__ == "__main__":
     observer.schedule(Handler(session), path=session.autosave_dir, recursive=False)
     observer.start()
 
-    session.load_next()
+    session.start()
 
     while True:
         try:
-            if session.track_limit and len(session.finished) >= session.track_limit:
-                break
             if session.stop_time and datetime.datetime.now() >= session.stop_time:
+                break
+            if session.stop:
                 break
 
             session.status()

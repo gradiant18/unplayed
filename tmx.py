@@ -2,11 +2,44 @@ import requests
 import time
 import subprocess
 import os
+from pygbx2 import get_replay_time
 
 
-def get_tracks(track_rules, site, banned_tracks):
+class Track:
+    def __init__(self, track):
+        self.path = ""
+        self.name = track["TrackName"]
+        self.track_id = track["TrackId"]
+        self.uid = track["UId"]
+        self.medal = None
+        self.medals = {
+            "author": track["AuthorTime"],
+            "gold": track["GoldTarget"],
+            "silver": track["SilverTarget"],
+            "bronze": track["BronzeTarget"],
+        }
+
+    def update_medal(self, replay_path):
+        replay_time = get_replay_time(replay_path)
+
+        for medal in self.medals:
+            if replay_time <= self.medals[medal]:
+                self.medal = medal
+                return
+
+    def download(self, track_dir, site, site_url):
+        self.path = download_track(track_dir, site, site_url, self.track_id)
+
+    def __str__(self):
+        return f"{self.name = }, {self.path = }, {self.uid = }, {self.medal = }, {self.medals = }"
+
+
+def get_tracks(site, track_rules, banned_tracks, autosaves):
     api_url = f"https://{site}/api/tracks?"
-    params = {"fields": "TrackId,UId,TrackName", "count": 1000}
+    params = {
+        "fields": "TrackId,TrackName,UId,AuthorTime,GoldTarget,SilverTarget,BronzeTarget",
+        "count": 1000,
+    }
     for param in track_rules:
         value = track_rules.get(param)
         if value is not None:
@@ -15,7 +48,7 @@ def get_tracks(track_rules, site, banned_tracks):
     if not banned_tracks:
         banned_tracks = set()
 
-    ids = set()
+    tracks = set()
     current_last = 0
 
     while True:
@@ -32,8 +65,9 @@ def get_tracks(track_rules, site, banned_tracks):
             for track in results:
                 if str(track["TrackId"]) in banned_tracks:
                     continue
-                track_name = track["TrackName"].strip("/\\'\"")
-                ids.add((track["TrackId"], track["UId"], track_name))
+                if track["UId"] in autosaves:
+                    continue
+                tracks.add(Track(track))
 
             if not data.get("More", False):
                 break
@@ -45,25 +79,21 @@ def get_tracks(track_rules, site, banned_tracks):
             time.sleep(1)
             continue
 
-    return ids
+    return tracks
 
 
-def download_track(track_dir, site, track_id):
-    dirs = {
-        "tmnf.exchange": "TMNF-X",
-        "tmuf.exchange": "TMUF-X",
-        "original.tm-exchange.com": "TMO-X",
-        "sunrise.tm-exchange.com": "TMS-X",
-        "nations.tm-exchnage.com": "TMN-X",
-    }
-    dir_path = os.path.join(track_dir, dirs[site])
+def download_track(track_dir, site, site_url, track_id):
+    # check dir path
+    dir_path = os.path.join(track_dir, site)
     if not os.path.exists(dir_path):
         os.mkdir(dir_path)
+
+    # check file path
     file_path = os.path.join(dir_path, f"{track_id}.Challenge.gbx")
     if os.path.exists(file_path):
         return file_path
 
-    download_url = f"https://{site}/trackgbx/{track_id}"
+    download_url = f"https://{site_url}/trackgbx/{track_id}"
 
     retries = 0
     while retries < 3:
