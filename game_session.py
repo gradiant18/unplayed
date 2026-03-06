@@ -89,7 +89,7 @@ class GameSession:
         if not self.next.path:
             self.get_next()
 
-        # load_track_in_game(self.config["exe_path"], self.next.path)
+        load_track_in_game(self.config["exe_path"], self.next.path)
 
         self.current = self.next
         self.get_next()
