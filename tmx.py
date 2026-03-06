@@ -51,10 +51,9 @@ def get_tracks(site, track_rules):
         "fields": "TrackId,TrackName,UId,AuthorTime,GoldTarget,SilverTarget,BronzeTarget",
         "count": 1000,
     }
-    for param in track_rules:
-        value = track_rules.get(param)
+    for param, value in track_rules.items():
         if value is not None:
-            params[f"{param}"] = value
+            params[param] = value
 
     tracks = []
     current_last = 0
@@ -70,8 +69,7 @@ def get_tracks(site, track_rules):
             if not results:
                 break
 
-            for track in results:
-                tracks.append(Track(track))
+            tracks.extend([Track(track) for track in results])
 
             if not data.get("More", False):
                 break
