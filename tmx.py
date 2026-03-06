@@ -46,7 +46,7 @@ def get_site_url(site):
 
 
 def get_tracks(site, track_rules):
-    api_url = f"https://{site}/api/tracks?"
+    api_url = f"https://{get_site_url(site)}/api/tracks?"
     params = {
         "fields": "TrackId,TrackName,UId,AuthorTime,GoldTarget,SilverTarget,BronzeTarget",
         "count": 1000,

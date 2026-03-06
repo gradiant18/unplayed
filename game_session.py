@@ -5,22 +5,25 @@ import os
 from pygbx2 import get_uid, get_replay_time
 import random
 import time
-from tmx import load_track_in_game, get_tracks, get_site_url
+from tmx import load_track_in_game, get_tracks
 
 
 class GameSession:
     def __init__(self, config):
         self.config = config
-
         self.mode = config.get("next_mode", "author")
         self.site = config.get("site", "TMNF-X")
-        self.site_url = get_site_url(self.site)
 
         self.finished = []
         self.autosave_dir = f"{self.config['track_dir']}/Replays/Autosaves"
         self.autosaves = self._get_autosaves()
-        self.tracks = get_tracks(self.site_url, config["track_rules"])
+        self.tracks = get_tracks(self.site, config["track_rules"])
         self._clean_tracks()
+        self.banned_tracks = (
+            config["banned_tracks"][self.site]
+            if config.get("banned_tracks") and config["banned_tracks"].get(self.site)
+            else []
+        )
 
         self.start_time = datetime.now()
         self.stop_time = self._calculate_stop_time()
@@ -30,7 +33,7 @@ class GameSession:
     def _clean_tracks(self):
         clean_tracks = []
         for track in self.tracks:
-            if track.track_id in self.config["banned_tracks"].get(self.site):
+            if track.track_id in self.banned_tracks:
                 continue
             if track.uid in self.autosaves:
                 continue
