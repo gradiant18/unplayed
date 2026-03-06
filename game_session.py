@@ -3,8 +3,9 @@ import json
 from multiprocessing import Pool
 import os
 from pygbx2 import get_uid, get_replay_time
+import random
 import time
-from tmx import load_track_in_game, get_tracks
+from tmx import load_track_in_game, get_tracks, get_site_url
 
 
 class GameSession:
@@ -13,22 +14,28 @@ class GameSession:
 
         self.mode = config.get("next_mode", "author")
         self.site = config.get("site", "TMNF-X")
-        self.site_url = self._get_site_url()
+        self.site_url = get_site_url(self.site)
 
         self.finished = []
         self.autosave_dir = f"{self.config['track_dir']}/Replays/Autosaves"
         self.autosaves = self._get_autosaves()
-        self.tracks = get_tracks(
-            self.site_url,
-            config["track_rules"],
-            set(config["banned_tracks"][self.site]),
-            self.autosaves,
-        )
+        self.tracks = get_tracks(self.site_url, config["track_rules"])
+        self._clean_tracks()
 
         self.start_time = datetime.now()
         self.stop_time = self._calculate_stop_time()
         self.track_limit = config.get("track_limit")
         self.stop = False
+
+    def _clean_tracks(self):
+        clean_tracks = []
+        for track in self.tracks:
+            if track.track_id in self.config["banned_tracks"].get(self.site):
+                continue
+            if track.uid in self.autosaves:
+                continue
+            clean_tracks.append(track)
+        self.tracks = clean_tracks
 
     def _get_autosaves(self):
         files = []
@@ -38,16 +45,6 @@ class GameSession:
         with Pool(16) as pool:
             autosaves = set(pool.imap_unordered(get_uid, files))
         return autosaves
-
-    def _get_site_url(self):
-        sites = {
-            "TMUF-X": "tmuf.exchange",
-            "TMNF-X": "tmnf.exchange",
-            "TMO-X": "original.tm-exchange.com",
-            "TMS-X": "sunrise.tm-exchange.com",
-            "TMN-X": "nations.tm-exchange.com",
-        }
-        return sites[self.site]
 
     def _calculate_stop_time(self):
         limit = self.config.get("time_limit")
@@ -70,12 +67,14 @@ class GameSession:
     def get_next(self):
         while True:
             try:
-                self.next = self.tracks.pop()
-            except KeyError:
+                self.next = random.choice(self.tracks)
+                self.tracks.remove(self.next)
+            except IndexError:
                 print("No more tracks")
+                self.stop = True
                 return
 
-            self.next.download(self.config["track_dir"], self.site, self.site_url)
+            self.next.download(self.config["track_dir"], self.site)
             if self.next.path is not None:
                 return
 
@@ -90,7 +89,7 @@ class GameSession:
         if not self.next.path:
             self.get_next()
 
-        load_track_in_game(self.config["exe_path"], self.next.path)
+        # load_track_in_game(self.config["exe_path"], self.next.path)
 
         self.current = self.next
         self.get_next()
@@ -117,9 +116,9 @@ class GameSession:
             self.finished.append(info)
         self.save()
         if (
-            len(self.tracks) == 0
-            and self.track_limit
-            and len(self.finished) >= self.track_limit
+            len(self.tracks) == 0  # no tracks left
+            and self.track_limit  # track_limit exists
+            and len(self.finished) >= self.track_limit  # finished enough tracks
         ):
             print("\nshould stop soon")
             self.stop = True
