@@ -30,6 +30,9 @@ class Track:
     def download(self, track_dir, site):
         self.path = download_track(track_dir, site, self.track_id)
 
+    def load(self, exe_path):
+        load_track_in_game(exe_path, self.path)
+
     def __str__(self):
         return f"{self.name = }, {self.path = }, {self.uid = }, {self.medal = }, {self.medals = }"
 
