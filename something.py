@@ -1,16 +1,21 @@
 import threading
+import json
 import random
 import time
 import requests
 from queue import Queue
-import os
-from multiprocessing import Pool
 import yaml
 from pygbx2 import get_uid, get_replay_time
 from watchdog.observers import Observer
 from watchdog.events import PatternMatchingEventHandler
 from tmx import Track
-from datetime import datetime, timedelta
+from datetime import datetime
+from helper import (
+    _get_autosaves,
+    _get_site_url,
+    _calculate_stop_time,
+    _format_timedelta,
+)
 
 
 class Handler(PatternMatchingEventHandler):
@@ -53,13 +58,14 @@ class Game:
         self.stop_session = False
 
     def start(self):
-        self.autosaves = self._get_autosaves()
-        self.stop_time = self._calculate_stop_time()
+        self.autosaves = _get_autosaves(self)
+        self.start_time = datetime.now()
+        self.stop_time = _calculate_stop_time(self)
 
         threading.Thread(target=self._get_tracks, daemon=True).start()
         threading.Thread(target=self._limits, daemon=True).start()
 
-        print("Waiting for first batch of tracks...")
+        # print("Waiting for first batch of tracks...")
         while not self.tracks and not self.fetching_done:
             time.sleep(0.1)
 
@@ -79,12 +85,22 @@ class Game:
         self.observer = Observer()
         self.observer.schedule(Handler(self), path=self.autosave_dir, recursive=False)
         self.observer.start()
-        self._main()
+        threading.Thread(target=self._main, daemon=True).start()
 
+    def stop(self):
+        self.stop_session = True
+
+    def skip(self):
+        session.go_next = True
+
+    def reload(self):
+        time.sleep(0.5)
+        session.current.load(self.config["exe_path"])
+
+    # TODO: clean up function
     def _limits(self):
         while True:
             if self.stop_session:
-                print("should be stoppd")
                 if self.observer:
                     self.observer.stop()
                     self.observer.join()
@@ -95,70 +111,26 @@ class Game:
                 and len(self.finished) >= 1
                 and len(self.finished) >= self.track_limit
             ):
-                print("Track limit reached")
+                print("\nTrack limit reached")
                 self.stop_session = True
                 continue
             if self.stop_time and datetime.now() > self.stop_time:
-                print("Time limit reached")
+                print("\nTime limit reached")
                 self.stop_session = True
                 continue
 
             time.sleep(0.1)
 
-    def _calculate_stop_time(self):
-        limit = self.time_limit
-        if not limit:
-            return None
-
-        if isinstance(limit, int):
-            return datetime.now() + timedelta(seconds=limit)
-        dt = timedelta(
-            hours=int(limit[:2]), minutes=int(limit[3:5]), seconds=int(limit[6:])
-        )
-        return datetime.now() + dt
-
     def _main(self):
         while not self.stop_session:
-            try:
-                if self.go_next:
-                    self.current = self.next.get()
-                    print(f">>> [Player] Now Playing: {self.current.name}")
-                    print(f"track limit: {self.track_limit}")
-                    self.current.load(self.config["exe_path"])
-                    self.go_next = False
-                time.sleep(0.1)
-            except KeyboardInterrupt:
-                choice = input("a) Skip b) Reload c) Quit >> ")
-                if choice == "a":
-                    self.go_next = True
-                elif choice == "b":
-                    time.sleep(0.5)
-                    self.current.load(self.config["exe_path"])
-                elif choice == "c":
-                    self.stop_session = True
-                    break
-
-    def _get_autosaves(self):
-        files = []
-        for entry in os.scandir(self.autosave_dir):
-            if entry.is_file():
-                files.append(entry.path)
-        with Pool(16) as pool:
-            autosaves = set(pool.imap_unordered(get_uid, files))
-        return autosaves
-
-    def _get_site_url(self):
-        sites = {
-            "TMUF-X": "tmuf.exchange",
-            "TMNF-X": "tmnf.exchange",
-            "TMO-X": "original.tm-exchange.com",
-            "TMS-X": "sunrise.tm-exchange.com",
-            "TMN-X": "nations.tm-exchange.com",
-        }
-        return sites[self.site]
+            if self.go_next:
+                self.current = self.next.get()
+                self.current.load(self.config["exe_path"])
+                self.go_next = False
+            time.sleep(0.1)
 
     def _get_tracks(self):
-        api_url = f"https://{self._get_site_url()}/api/tracks?"
+        api_url = f"https://{_get_site_url(self)}/api/tracks?"
         params = {
             "fields": "TrackId,TrackName,UId,AuthorTime,GoldTarget,SilverTarget,BronzeTarget",
             "count": 1000,
@@ -197,20 +169,18 @@ class Game:
         self.fetching_done = True
         if self.config.get("track_limit") == "all":
             self.track_limit = len(self.tracks)
-        print(f"Found a total of {len(self.tracks)} tracks.")
+        print(f"\nFound a total of {len(self.tracks)} tracks.")
 
     def _downloader(self):
         while len(self.tracks) > 0 and not self.stop_session:
             track = random.choice(self.tracks)
             self.tracks.remove(track)
 
-            print(f"downloading {track.name}")
             track.download(self.track_dir, self.site)
             self.next.put(track)
             time.sleep(0.5)
 
     def update_session(self, replay_path):
-        print("authosave time")
         replay_uid = get_uid(replay_path)
         if self.current.uid != replay_uid:
             return
@@ -220,21 +190,75 @@ class Game:
         if self.mode != "finished":
             replay_time = get_replay_time(replay_path)
             if not replay_time:
-                print("\nCouldn't get replay_time")
-                raise SystemExit
+                raise AttributeError("Couldn't get replay_time")
             if replay_time > self.current.medals[self.mode]:
                 return
 
         self.autosaves.add(replay_uid)
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        info = [self.current.medal, replay_uid, timestamp]
-        if info not in self.finished:
-            self.finished.append(info)
-        if len(self.tracks) == 0 and self.next.qsize() == 0:  # no tracks left
-            print(self.finished)
-            self.stop_session = True
+        self.current.time = timestamp
 
-        self.go_next = True
+        if len(self.finished) == 0:
+            self.finished.append(self.current.__dict__)
+        else:
+            added = False
+            for track in self.finished:
+                if self.current.uid == track["uid"]:
+                    added = True
+                    break
+            if not added:
+                self.finished.append(self.current.__dict__)
+
+        self.save()
+        if len(self.tracks) >= 0 and not self.stop_session:
+            self.go_next = True
+
+    def save(self):
+        if len(self.finished) == 0 and not self.config.get("save_empty"):
+            return
+        timestamp = self.start_time.strftime("%Y-%m-%d_%H-%M-%S")
+        with open(f"sessions/{timestamp}.json", "w") as file:
+            json.dump(self.finished, file, indent=2)
+
+    def get_tracks_left(self):
+        if self.track_limit:
+            return self.track_limit - len(self.finished)
+        return None
+
+    def get_time_left(self):
+        if self.stop_time:
+            return _format_timedelta(self, self.stop_time - datetime.now())
+        return None
+
+    def get_current(self):
+        try:
+            return self.current
+        except AttributeError:
+            return None
+
+    def __str__(self):
+        if not self.get_current():
+            return ""
+
+        tracks_played = f"Tracks Played: {len(self.finished)} | "
+
+        tracks_left = ""
+        if self.track_limit:
+            tracks_left = f"Tracks Left: {self.get_tracks_left()} | "
+
+        time_left = ""
+        if self.stop_time:
+            time_left = f"Time Left: {self.get_time_left()} | "
+
+        current_medal = ""
+        if self.mode != "finished" or "bronze":
+            medal = "None"
+            if self.current.medal:
+                medal = self.current.medal.capitalize()
+            current_medal = f"Current Medal: {medal} | "
+
+        current_track = f"Current Track: {self.current.name}"
+        return f"{tracks_played}{tracks_left}{time_left}{current_medal}{current_track}"
 
 
 if __name__ == "__main__":
@@ -243,6 +267,15 @@ if __name__ == "__main__":
     session = Game(config)
     session.start()
     while not session.stop_session:
-        print("session still going")
-        time.sleep(0.1)
+        try:
+            print(session, end="\r")
+            time.sleep(0.1)
+        except KeyboardInterrupt:
+            choice = input("\na) Skip b) Reload c) Quit >> ")
+            if choice == "a":
+                session.skip()
+            elif choice == "b":
+                session.reload()
+            elif choice == "c":
+                session.stop()
     print("session stopped")

@@ -7,10 +7,10 @@ from pygbx2 import get_replay_time
 
 class Track:
     def __init__(self, track):
-        self.path = ""
         self.name = track["TrackName"]
-        self.track_id = track["TrackId"]
+        self.path = ""
         self.uid = track["UId"]
+        self.track_id = track["TrackId"]
         self.medal = None
         self.medals = {
             "author": track["AuthorTime"],
@@ -18,6 +18,7 @@ class Track:
             "silver": track["SilverTarget"],
             "bronze": track["BronzeTarget"],
         }
+        self.time = None
 
     def update_medal(self, replay_path):
         replay_time = get_replay_time(replay_path)
