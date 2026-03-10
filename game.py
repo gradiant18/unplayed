@@ -1,20 +1,17 @@
-import threading
 import json
 import random
+import threading
 import time
-import requests
+from datetime import datetime
 from queue import Queue
-import yaml
-from pygbx2 import get_uid, get_replay_time
 from watchdog.observers import Observer
 from watchdog.events import PatternMatchingEventHandler
-from tmx import Track
-from datetime import datetime
 from helper import (
-    _get_autosaves,
-    _get_site_url,
-    _calculate_stop_time,
-    _format_timedelta,
+    get_autosaves,
+    calculate_stop_time,
+    format_timedelta,
+    get_tracks,
+    get_uid,
 )
 
 
@@ -56,55 +53,43 @@ class Game:
         self.go_next = False
         self.fetching_done = False
         self.stop_session = False
+        self.stopped = False
 
     def start(self):
-        self.autosaves = _get_autosaves(self)
+        self.autosaves = get_autosaves(self)
         self.start_time = datetime.now()
-        self.stop_time = _calculate_stop_time(self)
+        self.stop_time = calculate_stop_time(self)
 
-        threading.Thread(target=self._get_tracks, daemon=True).start()
-        threading.Thread(target=self._limits, daemon=True).start()
+        threading.Thread(target=get_tracks(self), daemon=True).start()
+        threading.Thread(target=self.main, daemon=True).start()
 
-        # print("Waiting for first batch of tracks...")
         while not self.tracks and not self.fetching_done:
             time.sleep(0.1)
 
         if not self.tracks:
-            print("No tracks found matching your parameters!")
+            print("no tracks found matching your parameters")
             self.stop_session = True
             return
 
         if self.config.get("track_limit") == "all":
             self.track_limit = len(self.tracks)
         else:
-            self.track_limit = config.get("track_limit")
+            self.track_limit = self.config.get("track_limit")
 
-        threading.Thread(target=self._downloader, daemon=True).start()
+        threading.Thread(target=self.downloader, daemon=True).start()
 
         self.go_next = True
         self.observer = Observer()
         self.observer.schedule(Handler(self), path=self.autosave_dir, recursive=False)
         self.observer.start()
-        threading.Thread(target=self._main, daemon=True).start()
 
-    def stop(self):
-        self.stop_session = True
-
-    def skip(self):
-        session.go_next = True
-
-    def reload(self):
-        time.sleep(0.5)
-        session.current.load(self.config["exe_path"])
-
-    # TODO: clean up function
-    def _limits(self):
-        while True:
-            if self.stop_session:
-                if self.observer:
-                    self.observer.stop()
-                    self.observer.join()
-                return
+    def main(self):
+        while not self.stop_session:
+            if self.go_next:
+                self.current = self.next.get()
+                self.current.load(self.config["exe_path"])
+                self.go_next = False
+            time.sleep(0.1)
 
             if (
                 self.track_limit
@@ -113,65 +98,30 @@ class Game:
             ):
                 print("\nTrack limit reached")
                 self.stop_session = True
-                continue
             if self.stop_time and datetime.now() > self.stop_time:
                 print("\nTime limit reached")
                 self.stop_session = True
-                continue
 
             time.sleep(0.1)
+        self.stop()
 
-    def _main(self):
-        while not self.stop_session:
-            if self.go_next:
-                self.current = self.next.get()
-                self.current.load(self.config["exe_path"])
-                self.go_next = False
-            time.sleep(0.1)
+    def stop(self):
+        print("stop just got called")
+        self.stop_session = True
+        if self.observer:
+            self.observer.stop()
+            self.observer.join()
+        self.save()
+        self.stopped = True
 
-    def _get_tracks(self):
-        api_url = f"https://{_get_site_url(self)}/api/tracks?"
-        params = {
-            "fields": "TrackId,TrackName,UId,AuthorTime,GoldTarget,SilverTarget,BronzeTarget",
-            "count": 1000,
-        }
-        for param, value in self.config["track_rules"].items():
-            if value is not None:
-                params[param] = value
+    def skip(self):
+        self.go_next = True
 
-        current_last = 0
-        while not self.stop_session:
-            try:
-                params["after"] = current_last
-                response = requests.get(api_url, params=params, timeout=10)
-                data = response.json()
-                results = data.get("Results", [])
+    def reload(self):
+        time.sleep(0.5)
+        self.current.load(self.config["exe_path"])
 
-                if not results:
-                    break
-
-                for track in results:
-                    if track["UId"] in self.autosaves:
-                        continue
-                    if track["TrackId"] in self.banned_tracks:
-                        continue
-                    self.tracks.append(Track(track))
-                current_last = results[-1]["TrackId"]
-
-                if not data.get("More", False):
-                    break
-
-            except requests.exceptions.RequestException as e:
-                print(e)
-                time.sleep(1)
-                continue
-
-        self.fetching_done = True
-        if self.config.get("track_limit") == "all":
-            self.track_limit = len(self.tracks)
-        print(f"\nFound a total of {len(self.tracks)} tracks.")
-
-    def _downloader(self):
+    def downloader(self):
         while len(self.tracks) > 0 and not self.stop_session:
             track = random.choice(self.tracks)
             self.tracks.remove(track)
@@ -183,14 +133,11 @@ class Game:
     def update_session(self, replay_path):
         replay_uid = get_uid(replay_path)
         if self.current.uid != replay_uid:
+            print("crazy hair don't care")
             return
 
-        self.current.update_medal(replay_path)
-
+        replay_time = self.current.update_medal(replay_path)
         if self.mode != "finished":
-            replay_time = get_replay_time(replay_path)
-            if not replay_time:
-                raise AttributeError("Couldn't get replay_time")
             if replay_time > self.current.medals[self.mode]:
                 return
 
@@ -227,7 +174,7 @@ class Game:
 
     def get_time_left(self):
         if self.stop_time:
-            return _format_timedelta(self, self.stop_time - datetime.now())
+            return format_timedelta(self.stop_time - datetime.now())
         return None
 
     def get_current(self):
@@ -259,23 +206,3 @@ class Game:
 
         current_track = f"Current Track: {self.current.name}"
         return f"{tracks_played}{tracks_left}{time_left}{current_medal}{current_track}"
-
-
-if __name__ == "__main__":
-    with open("config.yaml") as file:
-        config = yaml.safe_load(file)
-    session = Game(config)
-    session.start()
-    while not session.stop_session:
-        try:
-            print(session, end="\r")
-            time.sleep(0.1)
-        except KeyboardInterrupt:
-            choice = input("\na) Skip b) Reload c) Quit >> ")
-            if choice == "a":
-                session.skip()
-            elif choice == "b":
-                session.reload()
-            elif choice == "c":
-                session.stop()
-    print("session stopped")

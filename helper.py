@@ -1,20 +1,31 @@
 import os
-from multiprocessing import Pool
-from pygbx2 import get_uid
 from datetime import datetime, timedelta
+from track import Track
+import requests
+import time
+import re
+from concurrent.futures import ThreadPoolExecutor
 
 
-def _get_autosaves(self):
+def get_uid(path):
+    with open(path, "rb") as file:
+        data = str(file.read())
+    if not (match := re.search(r'uid="\w*"', data)):
+        return None
+    return match.group()[5:-1]
+
+
+def get_autosaves(self):
     files = []
     for entry in os.scandir(self.autosave_dir):
         if entry.is_file():
             files.append(entry.path)
-    with Pool(16) as pool:
-        autosaves = set(pool.imap_unordered(get_uid, files))
+    with ThreadPoolExecutor(max_workers=10) as exe:
+        autosaves = set(exe.map(get_uid, files))
     return autosaves
 
 
-def _get_site_url(self):
+def get_site_url(self):
     sites = {
         "TMUF-X": "tmuf.exchange",
         "TMNF-X": "tmnf.exchange",
@@ -25,7 +36,7 @@ def _get_site_url(self):
     return sites[self.site]
 
 
-def _calculate_stop_time(self):
+def calculate_stop_time(self):
     limit = self.time_limit
     if not limit:
         return None
@@ -38,8 +49,50 @@ def _calculate_stop_time(self):
     return datetime.now() + dt
 
 
-def _format_timedelta(self, td):
+def format_timedelta(td):
     hours, remainder = divmod(td.seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
     seconds += td.microseconds / 1e6
     return f"{hours:02d}:{minutes:02d}:{int(seconds):02d}"
+
+
+def get_tracks(self):
+    api_url = f"https://{get_site_url(self)}/api/tracks?"
+    params = {
+        "fields": "TrackId,TrackName,UId,AuthorTime,GoldTarget,SilverTarget,BronzeTarget",
+        "count": 1000,
+    }
+    for param, value in self.config["track_rules"].items():
+        if value is not None:
+            params[param] = value
+
+    current_last = 0
+    while not self.stop_session:
+        try:
+            params["after"] = current_last
+            response = requests.get(api_url, params=params, timeout=10)
+            data = response.json()
+            results = data.get("Results", [])
+
+            if not results:
+                break
+
+            for track in results:
+                if track["UId"] in self.autosaves:
+                    continue
+                if track["TrackId"] in self.banned_tracks:
+                    continue
+                self.tracks.append(Track(track))
+            current_last = results[-1]["TrackId"]
+
+            if not data.get("More", False):
+                break
+
+        except requests.exceptions.RequestException as e:
+            print(e)
+            time.sleep(1)
+            continue
+
+    self.fetching_done = True
+    if self.config.get("track_limit") == "all":
+        self.track_limit = len(self.tracks)
