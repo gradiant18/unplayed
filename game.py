@@ -31,6 +31,7 @@ class Game:
         self.track_dir = config["track_dir"]
         self.autosave_dir = f"{self.track_dir}/Replays/Autosaves"
 
+        self.stop_time = None
         self.time_limit = config.get("time_limit")
         self.track_limit = None
         self.mode = config.get("next_mode", "author")
@@ -106,7 +107,7 @@ class Game:
         self.stop()
 
     def stop(self):
-        print("stop just got called")
+        print("\nstop just got called")
         self.stop_session = True
         if self.observer:
             self.observer.stop()
