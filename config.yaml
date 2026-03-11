@@ -1,9 +1,9 @@
 exe_path: /home/russell/.local/share/Steam/steamapps/common/TrackMania United/TmForever.exe
 track_dir: /home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks
 # HH:MM:SS (can be empty)
-time_limit: 00:30:00
+time_limit: 00:10:00
 # number of tracks to play or all for all available tracks
-track_limit: all
+track_limit: 10
 # author, gold, silver, bronze, finished
 next_mode: finished
 # TMUF-X, TMNF-X, TMO-X, TMS-X, TMN-X

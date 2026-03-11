@@ -12,6 +12,7 @@ from helper import (
     format_timedelta,
     get_tracks,
     get_uid,
+    save_autosaves,
 )
 
 
@@ -47,7 +48,8 @@ class Game:
 
         self.tracks = []
         self.finished = []
-        self.autosaves = get_autosaves(self)
+        self.data = get_autosaves(self)
+        self.autosaves = self.data["autosaves"]
 
         self.next = Queue(maxsize=1)
         self.observer = None
@@ -56,6 +58,7 @@ class Game:
         self.fetching_done = False
         self.stop_session = False
         self.stopped = False
+        self.start_time = datetime.now()
 
     def start(self):
         self.start_time = datetime.now()
@@ -113,6 +116,8 @@ class Game:
             self.observer.stop()
             self.observer.join()
         self.save()
+        self.data["autosaves"] = self.autosaves
+        save_autosaves(self.data)
         self.stopped = True
 
     def skip(self):
@@ -156,6 +161,8 @@ class Game:
                 self.finished.append(self.current.__dict__)
 
         self.save()
+        self.data["autosaves"] = self.autosaves
+        save_autosaves(self.data)
         if len(self.tracks) >= 0 and not self.stop_session:
             self.go_next = True
 

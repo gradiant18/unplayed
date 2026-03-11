@@ -10,8 +10,10 @@ import pickle
 
 
 def get_uid(path):
-    with open(path, "rb") as file:
-        data = str(file.read())
+    data = None
+    while not data:
+        with open(path, "rb") as file:
+            data = str(file.read())
 
     if not (match := re.search(r'uid="\w*"', data)):
         print("no uid for:", path)
@@ -28,12 +30,12 @@ def save_autosaves(data):
 def load():
     if not os.path.exists("auto.bin"):
         print("auto.bin doesn't exist")
-        return {"oldest": 0, "uids": None}
+        return {"oldest": 0, "autosaves": None}
     with open("auto.bin", "rb") as file:
         data = pickle.load(file)
     if not data:
         print("data isn't real")
-        data = {"oldest": 0, "uids": None}
+        data = {"oldest": 0, "autosaves": None}
     return data
 
 
@@ -54,14 +56,13 @@ def get_autosaves(self):
     data["oldest"] = oldest
 
     with ThreadPoolExecutor(max_workers=10) as exe:
-        uids = set(exe.map(get_uid, files))
+        autosaves = set(exe.map(get_uid, files))
 
-    if not data.get("uids"):
-        data["uids"] = uids
+    if not data.get("autosaves"):
+        data["autosaves"] = autosaves
     else:
-        data["uids"].update(uids)
-    save_autosaves(data)
-    return data["uids"]
+        data["autosaves"].update(autosaves)
+    return data
 
 
 def get_site_url(self):
@@ -96,7 +97,7 @@ def format_timedelta(td):
 
 
 def clean(self, track):
-    if track["TrackId"] in self.autosaves:
+    if track["TrackId"] in self.data["autosaves"]:
         return
     if track["UId"] in self.banned_tracks:
         return

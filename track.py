@@ -3,7 +3,6 @@ from pygbx import Gbx, GbxType
 import requests
 import subprocess
 import time
-from test import timer
 
 
 class Track:
@@ -30,7 +29,7 @@ class Track:
             if ghost.race_time <= self.medals[medal]:
                 self.medal = medal
                 break
-        return medal
+        return ghost.race_time
 
     # TODO: make not os/program dependent
     def load(self, exe_path):
