@@ -47,7 +47,8 @@ class Game:
 
         self.tracks = []
         self.finished = []
-        self.autosaves = set()
+        self.autosaves = get_autosaves(self)
+
         self.next = Queue(maxsize=1)
         self.observer = None
 
@@ -57,7 +58,6 @@ class Game:
         self.stopped = False
 
     def start(self):
-        self.autosaves = get_autosaves(self)
         self.start_time = datetime.now()
         self.stop_time = calculate_stop_time(self)
 
@@ -129,12 +129,10 @@ class Game:
 
             track.download(self.track_dir, self.site)
             self.next.put(track)
-            time.sleep(0.5)
 
     def update_session(self, replay_path):
         replay_uid = get_uid(replay_path)
         if self.current.uid != replay_uid:
-            print("crazy hair don't care")
             return
 
         replay_time = self.current.update_medal(replay_path)

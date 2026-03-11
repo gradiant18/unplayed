@@ -3,6 +3,7 @@ from pygbx import Gbx, GbxType
 import requests
 import subprocess
 import time
+from test import timer
 
 
 class Track:
@@ -73,6 +74,7 @@ class Track:
                 if track_response.status_code == 200:
                     with open(self.path, "wb") as file:
                         file.write(track_response.content)
+                    return
                 else:
                     print(track_response.status_code)
                 retries += 1
@@ -81,7 +83,7 @@ class Track:
                 print(f"Retry {retries + 1}/3 failed: {e}")
                 retries += 1
                 time.sleep(1)
-        return None
+        return
 
     def __str__(self):
         return str(self.__dict__)

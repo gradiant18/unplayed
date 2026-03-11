@@ -5,24 +5,63 @@ import requests
 import time
 import re
 from concurrent.futures import ThreadPoolExecutor
+from itertools import repeat
+import pickle
 
 
 def get_uid(path):
     with open(path, "rb") as file:
         data = str(file.read())
+
     if not (match := re.search(r'uid="\w*"', data)):
+        print("no uid for:", path)
+        print(data)
         return None
     return match.group()[5:-1]
 
 
+def save_autosaves(data):
+    with open("auto.bin", "wb") as file:
+        pickle.dump(data, file)
+
+
+def load():
+    if not os.path.exists("auto.bin"):
+        print("auto.bin doesn't exist")
+        return {"oldest": 0, "uids": None}
+    with open("auto.bin", "rb") as file:
+        data = pickle.load(file)
+    if not data:
+        print("data isn't real")
+        data = {"oldest": 0, "uids": None}
+    return data
+
+
 def get_autosaves(self):
+    data = load()
     files = []
+    oldest = data["oldest"]
+
     for entry in os.scandir(self.autosave_dir):
-        if entry.is_file():
-            files.append(entry.path)
+        if not entry.is_file():
+            continue
+        if (old := os.path.getmtime(entry)) <= data["oldest"]:
+            continue
+
+        files.append(entry.path)
+        if old > oldest:
+            oldest = old
+    data["oldest"] = oldest
+
     with ThreadPoolExecutor(max_workers=10) as exe:
-        autosaves = set(exe.map(get_uid, files))
-    return autosaves
+        uids = set(exe.map(get_uid, files))
+
+    if not data.get("uids"):
+        data["uids"] = uids
+    else:
+        data["uids"].update(uids)
+    save_autosaves(data)
+    return data["uids"]
 
 
 def get_site_url(self):
@@ -56,6 +95,14 @@ def format_timedelta(td):
     return f"{hours:02d}:{minutes:02d}:{int(seconds):02d}"
 
 
+def clean(self, track):
+    if track["TrackId"] in self.autosaves:
+        return
+    if track["UId"] in self.banned_tracks:
+        return
+    self.tracks.append(Track(track))
+
+
 def get_tracks(self):
     api_url = f"https://{get_site_url(self)}/api/tracks?"
     params = {
@@ -77,12 +124,8 @@ def get_tracks(self):
             if not results:
                 break
 
-            for track in results:
-                if track["UId"] in self.autosaves:
-                    continue
-                if track["TrackId"] in self.banned_tracks:
-                    continue
-                self.tracks.append(Track(track))
+            with ThreadPoolExecutor(max_workers=10) as exe:
+                exe.map(clean, repeat(self), results)
             current_last = results[-1]["TrackId"]
 
             if not data.get("More", False):
