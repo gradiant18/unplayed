@@ -1,3 +1,6 @@
 __pycache__/*
 sessions/*
 venv/*
+gui
+.test.py
+.update_banned_tracks.py
