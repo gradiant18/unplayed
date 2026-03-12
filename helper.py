@@ -10,15 +10,16 @@ import pickle
 
 
 def get_uid(path):
-    data = None
-    while not data:
+    data = "b''"
+    while data == "b''":
         with open(path, "rb") as file:
             data = str(file.read())
 
     if not (match := re.search(r'uid="\w*"', data)):
-        print("no uid for:", path)
+        print("no  uid for:", path)
         print(data)
         return None
+    print("got uid for:", path)
     return match.group()[5:-1]
 
 

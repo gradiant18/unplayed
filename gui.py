@@ -1,15 +1,19 @@
+from math import remainder
 import sys
 import time
 from game import Game
 import threading
 import yaml
-
+from datetime import datetime, timedelta
+from PyQt6.QtCore import QTime
 from PyQt6.QtWidgets import (
     QApplication,
     QHBoxLayout,
     QLabel,
     QMainWindow,
     QPushButton,
+    QSpinBox,
+    QTimeEdit,
     QVBoxLayout,
     QWidget,
     QComboBox,
@@ -21,20 +25,58 @@ from PyQt6.QtWidgets import (
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("My App")
+        self.setWindowTitle("Randomizer")
+
+        with open("config.yaml") as file:
+            self.config = yaml.safe_load(file)
 
         # Tab 1
-        self.mode_input = "finished"
         self.combo = QComboBox()
         self.combo.addItems(["author", "gold", "silver", "bronze", "finished"])
-        self.combo.currentTextChanged.connect(self.on_input)
+        self.combo.setCurrentText(self.config["next_mode"])
+        self.combo.currentTextChanged.connect(
+            lambda val: self.on_input("next_mode", val)
+        )
+
+        self.track_spin = QSpinBox()
+        self.track_spin.setMinimum(0)
+        self.track_spin.setMaximum(1000)
+        self.track_spin.setValue(self.config["track_limit"])
+        self.track_spin.valueChanged.connect(
+            lambda val: self.on_input("track_limit", val)
+        )
+
+        self.time_edit = QTimeEdit()
+        self.time_edit.setDisplayFormat("HH:mm:ss")
+
+        self.times = self.config["time_limit"]
+        if isinstance(self.times, int):
+            hours, remainder = divmod(self.times, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            qtime = QTime(hours, minutes, seconds)
+        else:
+            qtime = QTime(
+                int(self.times[:2]), int(self.times[3:5]), int(self.times[6:])
+            )
+        print(self.times, qtime)
+        self.time_edit.setTime(qtime)
+        self.time_edit.timeChanged.connect(lambda val: self.on_input("time_limit", val))
 
         self.start_button = QPushButton("Start")
         self.start_button.setStyleSheet("background-color: green")
         self.start_button.clicked.connect(self.start)
 
+        self.print_button = QPushButton("Print Config")
+        self.print_button.clicked.connect(self.stinky)
+
+        main = QHBoxLayout()
+        main.addWidget(self.combo)
+        main.addWidget(self.track_spin)
+        main.addWidget(self.time_edit)
+
         tab = QVBoxLayout()
-        tab.addWidget(self.combo)
+        tab.addLayout(main)
+        tab.addWidget(self.print_button)
         tab.addWidget(self.start_button)
         tab1 = QWidget()
         tab1.setLayout(tab)
@@ -85,11 +127,14 @@ class MainWindow(QMainWindow):
         self.tab_widget = QTabWidget()
         self.tab_widget.addTab(tab1, "Tab 1")
         self.tab_widget.addTab(tab2, "Tab 2")
+        self.tab_widget.setTabEnabled(1, False)
 
         self.setCentralWidget(self.tab_widget)
 
-        with open("config.yaml") as file:
-            self.config = yaml.safe_load(file)
+        self.test = None
+
+    def stinky(self):
+        print(self.config)
 
     def start(self):
         self.stop_button.setStyleSheet("background-color: red")
@@ -100,7 +145,10 @@ class MainWindow(QMainWindow):
         self.session = Game(self.config)
         threading.Thread(target=self.update_progress, daemon=True).start()
         self.session.start()
+
         self.tab_widget.setCurrentIndex(1)
+        self.tab_widget.setTabEnabled(0, False)
+        self.tab_widget.setTabEnabled(1, True)
 
     def skip(self):
         self.session.skip()
@@ -110,11 +158,14 @@ class MainWindow(QMainWindow):
 
     def stop(self):
         self.session.stop()
+
         self.stop_button.setStyleSheet("background-color: grey")
         self.start_button.setStyleSheet("background-color: green")
         self.stop_button.setEnabled(False)
         self.start_button.setEnabled(True)
         self.tab_widget.setCurrentIndex(0)
+        self.tab_widget.setTabEnabled(0, True)
+        self.tab_widget.setTabEnabled(1, False)
 
     def update_progress(self):
         while not self.session.stopped:
@@ -141,9 +192,21 @@ class MainWindow(QMainWindow):
 
             time.sleep(0.1)
 
-    def on_input(self, changed):
-        print(changed)
-        self.config["next_mode"] = changed
+        self.stop_button.setStyleSheet("background-color: grey")
+        self.start_button.setStyleSheet("background-color: green")
+        self.stop_button.setEnabled(False)
+        self.start_button.setEnabled(True)
+        self.tab_widget.setCurrentIndex(0)
+        self.tab_widget.setTabEnabled(0, True)
+        self.tab_widget.setTabEnabled(1, False)
+
+    def on_input(self, key, value):
+        if key == "time_limit":
+            self.config[key] = value.toString("HH:mm:ss")
+            print(f"Widget {key} changed. new value: {value.toString('HH:mm:ss')}")
+        else:
+            self.config[key] = value
+            print(f"Widget {key} changed. new value: {value}")
 
 
 app = QApplication(sys.argv)
