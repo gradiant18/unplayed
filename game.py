@@ -132,6 +132,9 @@ class Game:
             track = random.choice(self.tracks)
             self.tracks.remove(track)
 
+            if track.uid in self.autosaves:
+                continue
+
             track.download(self.track_dir, self.site)
             self.next.put(track)
 

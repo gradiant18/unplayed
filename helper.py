@@ -19,7 +19,6 @@ def get_uid(path):
         print("no  uid for:", path)
         print(data)
         return None
-    print("got uid for:", path)
     return match.group()[5:-1]
 
 

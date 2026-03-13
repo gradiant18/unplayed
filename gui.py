@@ -1,10 +1,8 @@
-from math import remainder
 import sys
 import time
 from game import Game
 import threading
 import yaml
-from datetime import datetime, timedelta
 from PyQt6.QtCore import QTime
 from PyQt6.QtWidgets import (
     QApplication,
@@ -186,9 +184,7 @@ class MainWindow(QMainWindow):
 
                 progress = int(max) - (stop_time.timestamp() - time.time())
                 self.time_progress.setValue(int(progress))
-                self.times.setText(
-                    f"{self.session.get_time_left():^10}   {self.session.mode}"
-                )
+                self.times.setText(f"{self.session.get_time_left():^10}")
 
             time.sleep(0.1)
 
