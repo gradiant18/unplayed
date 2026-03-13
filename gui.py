@@ -1,8 +1,9 @@
+from datetime import timedelta
 import sys
 import time
 from game import Game
 import threading
-import yaml
+import pickle
 from PyQt6.QtCore import QTime
 from PyQt6.QtWidgets import (
     QApplication,
@@ -25,13 +26,13 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Randomizer")
 
-        with open("config.yaml") as file:
-            self.config = yaml.safe_load(file)
+        with open("config.bin", "rb") as file:
+            self.config = pickle.load(file)
 
         # Tab 1
         self.combo = QComboBox()
         self.combo.addItems(["author", "gold", "silver", "bronze", "finished"])
-        self.combo.setCurrentText(self.config["next_mode"])
+        self.combo.setCurrentText(self.config["game_rules"]["next_mode"])
         self.combo.currentTextChanged.connect(
             lambda val: self.on_input("next_mode", val)
         )
@@ -39,7 +40,7 @@ class MainWindow(QMainWindow):
         self.track_spin = QSpinBox()
         self.track_spin.setMinimum(0)
         self.track_spin.setMaximum(1000)
-        self.track_spin.setValue(self.config["track_limit"])
+        self.track_spin.setValue(self.config["game_rules"]["track_limit"])
         self.track_spin.valueChanged.connect(
             lambda val: self.on_input("track_limit", val)
         )
@@ -47,17 +48,8 @@ class MainWindow(QMainWindow):
         self.time_edit = QTimeEdit()
         self.time_edit.setDisplayFormat("HH:mm:ss")
 
-        self.times = self.config["time_limit"]
-        if isinstance(self.times, int):
-            hours, remainder = divmod(self.times, 3600)
-            minutes, seconds = divmod(remainder, 60)
-            qtime = QTime(hours, minutes, seconds)
-        else:
-            qtime = QTime(
-                int(self.times[:2]), int(self.times[3:5]), int(self.times[6:])
-            )
-        print(self.times, qtime)
-        self.time_edit.setTime(qtime)
+        limit = int(self.config["game_rules"]["time_limit"].total_seconds())
+        self.time_edit.setTime(QTime(0, 0, 0).addSecs(limit))
         self.time_edit.timeChanged.connect(lambda val: self.on_input("time_limit", val))
 
         self.start_button = QPushButton("Start")
@@ -140,6 +132,7 @@ class MainWindow(QMainWindow):
         self.stop_button.setEnabled(True)
         self.start_button.setEnabled(False)
 
+        self.config["track_rules"]["inhasrecord"] = None
         self.session = Game(self.config)
         threading.Thread(target=self.update_progress, daemon=True).start()
         self.session.start()
@@ -156,6 +149,7 @@ class MainWindow(QMainWindow):
 
     def stop(self):
         self.session.stop()
+        self.save_config()
 
         self.stop_button.setStyleSheet("background-color: grey")
         self.start_button.setStyleSheet("background-color: green")
@@ -168,11 +162,12 @@ class MainWindow(QMainWindow):
     def update_progress(self):
         while not self.session.stopped:
             if self.session.track_limit:
+                self.track_progress.setEnabled(True)
                 self.track_progress.setMaximum(self.session.track_limit)
                 self.track_progress.setValue(len(self.session.finished))
 
-                yes = f"{len(self.session.finished)}/{self.session.track_limit}"
-                self.tracks.setText(f"{yes:^10}")
+                progress = f"{len(self.session.finished)}/{self.session.track_limit}"
+                self.tracks.setText(f"{progress:^10}")
 
             if self.session.time_limit:
                 start_time = self.session.start_time
@@ -185,24 +180,28 @@ class MainWindow(QMainWindow):
                 progress = int(max) - (stop_time.timestamp() - time.time())
                 self.time_progress.setValue(int(progress))
                 self.times.setText(f"{self.session.get_time_left():^10}")
+            else:
+                self.times.setText("          ")
 
             time.sleep(0.1)
 
-        self.stop_button.setStyleSheet("background-color: grey")
-        self.start_button.setStyleSheet("background-color: green")
-        self.stop_button.setEnabled(False)
-        self.start_button.setEnabled(True)
-        self.tab_widget.setCurrentIndex(0)
-        self.tab_widget.setTabEnabled(0, True)
-        self.tab_widget.setTabEnabled(1, False)
+        self.stop()
 
     def on_input(self, key, value):
         if key == "time_limit":
-            self.config[key] = value.toString("HH:mm:ss")
-            print(f"Widget {key} changed. new value: {value.toString('HH:mm:ss')}")
-        else:
-            self.config[key] = value
+            print(value, type(value))
+            print(value.toPyTime())
+            self.config["game_rules"][key] = timedelta(
+                hours=value.hour(), minutes=value.minute(), seconds=value.second()
+            )
             print(f"Widget {key} changed. new value: {value}")
+        else:
+            self.config["game_rules"][key] = value
+            print(f"Widget {key} changed. new value: {value}")
+
+    def save_config(self):
+        with open("config.bin", "wb") as file:
+            pickle.dump(self.config, file)
 
 
 app = QApplication(sys.argv)

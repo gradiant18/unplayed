@@ -8,7 +8,6 @@ from watchdog.observers import Observer
 from watchdog.events import PatternMatchingEventHandler
 from helper import (
     get_autosaves,
-    calculate_stop_time,
     format_timedelta,
     get_tracks,
     get_uid,
@@ -32,12 +31,13 @@ class Game:
         self.track_dir = config["track_dir"]
         self.autosave_dir = f"{self.track_dir}/Replays/Autosaves"
 
+        self.start_time = datetime.now()
         self.stop_time = None
-        self.time_limit = config.get("time_limit")
-        self.track_limit = None
-        self.mode = config.get("next_mode", "author")
-        self.site = config.get("site", "TMNF-X")
-        self.save_empty = config.get("save_empty")
+        self.time_limit = config["game_rules"].get("time_limit")  # timedelta
+        self.track_limit = config["game_rules"].get("track_limit")
+        self.mode = config["game_rules"].get("next_mode", "author")
+        self.site = config["game_rules"].get("site", "TMNF-X")
+        self.save_empty = config["game_rules"].get("save_empty")
 
         self.track_rules = config.get("track_rules")
         self.banned_tracks = (
@@ -58,11 +58,11 @@ class Game:
         self.fetching_done = False
         self.stop_session = False
         self.stopped = False
-        self.start_time = datetime.now()
 
     def start(self):
         self.start_time = datetime.now()
-        self.stop_time = calculate_stop_time(self)
+        if self.time_limit.total_seconds() > 0:
+            self.stop_time = self.start_time + self.time_limit
 
         threading.Thread(target=get_tracks(self), daemon=True).start()
         threading.Thread(target=self.main, daemon=True).start()
@@ -75,10 +75,8 @@ class Game:
             self.stop_session = True
             return
 
-        if self.config.get("track_limit") == "all":
+        if self.track_limit == 0:
             self.track_limit = len(self.tracks)
-        else:
-            self.track_limit = self.config.get("track_limit")
 
         threading.Thread(target=self.downloader, daemon=True).start()
 

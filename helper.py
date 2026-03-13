@@ -1,5 +1,4 @@
 import os
-from datetime import datetime, timedelta
 from track import Track
 import requests
 import time
@@ -76,19 +75,6 @@ def get_site_url(self):
     return sites[self.site]
 
 
-def calculate_stop_time(self):
-    limit = self.time_limit
-    if not limit:
-        return None
-
-    if isinstance(limit, int):
-        return datetime.now() + timedelta(seconds=limit)
-    dt = timedelta(
-        hours=int(limit[:2]), minutes=int(limit[3:5]), seconds=int(limit[6:])
-    )
-    return datetime.now() + dt
-
-
 def format_timedelta(td):
     hours, remainder = divmod(td.seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
@@ -97,7 +83,7 @@ def format_timedelta(td):
 
 
 def clean(self, track):
-    if track["TrackId"] in self.data["autosaves"]:
+    if track["TrackId"] in self.autosaves:
         return
     if track["UId"] in self.banned_tracks:
         return
@@ -138,5 +124,5 @@ def get_tracks(self):
             continue
 
     self.fetching_done = True
-    if self.config.get("track_limit") == "all":
+    if self.track_limit != self.config["game_rules"]["track_limit"]:
         self.track_limit = len(self.tracks)
