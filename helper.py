@@ -38,12 +38,12 @@ def load():
     return data
 
 
-def get_autosaves(self):
+def get_autosaves(session):
     data = load()
     files = []
     oldest = data["oldest"]
 
-    for entry in os.scandir(self.autosave_dir):
+    for entry in os.scandir(session.autosave_dir):
         if not entry.is_file():
             continue
         if (old := os.path.getmtime(entry)) <= data["oldest"]:
@@ -64,7 +64,7 @@ def get_autosaves(self):
     return data
 
 
-def get_site_url(self):
+def get_session_url(session):
     sites = {
         "TMUF-X": "tmuf.exchange",
         "TMNF-X": "tmnf.exchange",
@@ -72,7 +72,7 @@ def get_site_url(self):
         "TMS-X": "sunrise.tm-exchange.com",
         "TMN-X": "nations.tm-exchange.com",
     }
-    return sites[self.site]
+    return sites[session.site]
 
 
 def format_timedelta(td):
@@ -82,26 +82,26 @@ def format_timedelta(td):
     return f"{hours:02d}:{minutes:02d}:{int(seconds):02d}"
 
 
-def clean(self, track):
-    if track["TrackId"] in self.autosaves:
+def clean(session, track):
+    if track["UId"] in session.autosaves:
         return
-    if track["UId"] in self.banned_tracks:
+    if track["TrackId"] in session.banned_tracks:
         return
-    self.tracks.append(Track(track))
+    session.tracks.append(Track(track))
 
 
-def get_tracks(self):
-    api_url = f"https://{get_site_url(self)}/api/tracks?"
+def get_tracks(session):
+    api_url = f"https://{get_session_url(session)}/api/tracks?"
     params = {
         "fields": "TrackId,TrackName,UId,AuthorTime,GoldTarget,SilverTarget,BronzeTarget",
         "count": 1000,
     }
-    for param, value in self.config["track_rules"].items():
+    for param, value in session.config["track_rules"].items():
         if value is not None:
             params[param] = value
 
     current_last = 0
-    while not self.stop_session:
+    while not session.stop_session:
         try:
             params["after"] = current_last
             response = requests.get(api_url, params=params, timeout=10)
@@ -112,7 +112,7 @@ def get_tracks(self):
                 break
 
             with ThreadPoolExecutor(max_workers=10) as exe:
-                exe.map(clean, repeat(self), results)
+                exe.map(clean, repeat(session), results)
             current_last = results[-1]["TrackId"]
 
             if not data.get("More", False):
@@ -123,6 +123,6 @@ def get_tracks(self):
             time.sleep(1)
             continue
 
-    self.fetching_done = True
-    if self.track_limit != self.config["game_rules"]["track_limit"]:
-        self.track_limit = len(self.tracks)
+    session.fetching_done = True
+    if session.track_limit != session.config["game_rules"]["track_limit"]:
+        session.track_limit = len(session.tracks)

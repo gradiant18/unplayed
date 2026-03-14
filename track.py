@@ -32,7 +32,7 @@ class Track:
         return ghost.race_time
 
     # TODO: make not os/program dependent
-    def load(self, exe_path):
+    def load(self, exe_path, debug):
         command = [
             "protontricks-launch",
             "--appid",
@@ -43,7 +43,8 @@ class Track:
             f"/file={self.path}",
         ]
 
-        subprocess.run(command)
+        if not debug:
+            subprocess.run(command)
 
     def download(self, track_dir, site):
         # check dir path

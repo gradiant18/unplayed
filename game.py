@@ -72,7 +72,7 @@ class Game:
 
         if not self.tracks:
             print("no tracks found matching your parameters")
-            self.stop_session = True
+            self.stop()
             return
 
         if self.track_limit == 0:
@@ -94,13 +94,15 @@ class Game:
             ):
                 print("\nTrack limit reached")
                 self.stop()
+                break
             if self.stop_time and datetime.now() > self.stop_time:
                 print("\nTime limit reached")
                 self.stop()
+                break
 
             if self.go_next:
                 self.current = self.next.get()
-                self.current.load(self.config["exe_path"])
+                self.current.load(self.config["exe_path"], self.config["debug"])
                 self.go_next = False
             time.sleep(0.1)
 

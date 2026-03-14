@@ -84,6 +84,24 @@ class MainWindow(QMainWindow):
         dates.addWidget(self.after)
         dates.addWidget(self.before)
 
+        # authortimemin
+        self.at_min = QTimeEdit()
+        self.at_min.setDisplayFormat("HH:mm:ss")
+        min = self.config["track_rules"]["authortimemin"]
+        self.at_min.setTime(QTime(0, 0, 0).fromMSecsSinceStartOfDay(min))
+        self.at_min.timeChanged.connect(lambda val: self.on_input("authortimemin", val))
+
+        # authortimemax
+        self.at_max = QTimeEdit()
+        self.at_max.setDisplayFormat("HH:mm:ss")
+        max = self.config["track_rules"]["authortimemax"]
+        self.at_max.setTime(QTime(0, 0, 0).fromMSecsSinceStartOfDay(max))
+        self.at_max.timeChanged.connect(lambda val: self.on_input("authortimemax", val))
+
+        ats = QHBoxLayout()
+        ats.addWidget(self.at_min)
+        ats.addWidget(self.at_max)
+
         self.start_button = QPushButton("Start")
         self.start_button.setStyleSheet("background-color: green")
         self.start_button.clicked.connect(self.start)
@@ -99,6 +117,7 @@ class MainWindow(QMainWindow):
         tab = QVBoxLayout()
         tab.addLayout(main)
         tab.addWidget(self.site)
+        tab.addLayout(ats)
         tab.addLayout(dates)
         tab.addWidget(self.start_button)
         tab.addWidget(self.save_button)
@@ -165,6 +184,12 @@ class MainWindow(QMainWindow):
         self.start_button.setStyleSheet("background-color: grey")
         self.stop_button.setEnabled(True)
         self.start_button.setEnabled(False)
+
+        if len(sys.argv) == 2:
+            print("debug mode enabled")
+            self.config["debug"] = True
+        else:
+            self.config["debug"] = False
 
         self.session = Game(self.config)
         threading.Thread(target=self.update_progress, daemon=True).start()
@@ -239,6 +264,8 @@ class MainWindow(QMainWindow):
                     value.toSecsSinceEpoch()
                 )
                 print(f"Widget {key} changed. new value: {value.toSecsSinceEpoch()}")
+            if key == "authortimemin" or key == "authortimemax":
+                self.config["track_rules"][key] = value.msecsSinceStartOfDay()
 
     def save_config(self):
         with open("config.bin", "wb") as file:
