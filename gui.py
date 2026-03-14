@@ -2,9 +2,8 @@ from datetime import datetime, timedelta
 import sys
 import time
 from game import Game
-import threading
 import pickle
-from PyQt6.QtCore import QDateTime, QTime
+from PyQt6.QtCore import QDateTime, QTime, QTimer
 from PyQt6.QtWidgets import (
     QApplication,
     QDateTimeEdit,
@@ -173,8 +172,9 @@ class MainWindow(QMainWindow):
         self.tab_widget.setTabEnabled(1, False)
 
         self.setCentralWidget(self.tab_widget)
-
         self.test = None
+        self.progress_timer = QTimer(self)
+        self.progress_timer.timeout.connect(self.update_progress)
 
     def stinky(self):
         print(self.config)
@@ -192,7 +192,7 @@ class MainWindow(QMainWindow):
             self.config["debug"] = False
 
         self.session = Game(self.config)
-        threading.Thread(target=self.update_progress, daemon=True).start()
+        self.progress_timer.start(100)
         self.session.start()
 
         self.tab_widget.setCurrentIndex(1)
@@ -218,38 +218,37 @@ class MainWindow(QMainWindow):
         self.tab_widget.setTabEnabled(1, False)
 
     def update_progress(self):
-        while not self.session.stopped:
-            if self.session.track_limit:
-                self.track_progress.setEnabled(True)
-                self.track_progress.setMaximum(self.session.track_limit)
-                self.track_progress.setValue(len(self.session.finished))
+        if self.session.stopped:
+            self.progress_timer.stop()
+            self.stop()
+            return
 
-                progress = f"{len(self.session.finished)}/{self.session.track_limit}"
-                self.tracks.setText(f"{progress:^10}")
+        if self.session.track_limit:
+            self.track_progress.setEnabled(True)
+            self.track_progress.setMaximum(self.session.track_limit)
+            self.track_progress.setValue(len(self.session.finished))
 
-            if self.session.time_limit:
-                start_time = self.session.start_time
-                stop_time = self.session.stop_time
-                if not stop_time:
-                    continue
+            progress = f"{len(self.session.finished)}/{self.session.track_limit}"
+            self.tracks.setText(f"{progress:^10}")
+
+        if self.session.time_limit:
+            start_time = self.session.start_time
+            stop_time = self.session.stop_time
+
+            if stop_time:
                 max = stop_time.timestamp() - start_time.timestamp()
                 self.time_progress.setMaximum(int(max))
 
                 progress = int(max) - (stop_time.timestamp() - time.time())
                 self.time_progress.setValue(int(progress))
                 self.times.setText(f"{self.session.get_time_left():^10}")
-            else:
-                self.times.setText("          ")
-
-            time.sleep(0.1)
-
-        self.stop()
+        else:
+            self.times.setText("          ")
 
     def on_input(self, key, value):
         if key in ["time_limit", "track_limit", "next_mode", "site"]:
+            # game_rules
             if key == "time_limit":
-                print(value, type(value))
-                print(value.toPyTime())
                 self.config["game_rules"][key] = timedelta(
                     hours=value.hour(), minutes=value.minute(), seconds=value.second()
                 )
@@ -258,7 +257,7 @@ class MainWindow(QMainWindow):
                 self.config["game_rules"][key] = value
                 print(f"Widget {key} changed. new value: {value}")
         else:
-            print(value)
+            # track_rules
             if key == "uploadedafter" or key == "uploadedbefore":
                 self.config["track_rules"][key] = datetime.fromtimestamp(
                     value.toSecsSinceEpoch()
@@ -266,6 +265,9 @@ class MainWindow(QMainWindow):
                 print(f"Widget {key} changed. new value: {value.toSecsSinceEpoch()}")
             if key == "authortimemin" or key == "authortimemax":
                 self.config["track_rules"][key] = value.msecsSinceStartOfDay()
+                print(
+                    f"Widget {key} changed. new value: {value.msecsSinceStartOfDay()}"
+                )
 
     def save_config(self):
         with open("config.bin", "wb") as file:
