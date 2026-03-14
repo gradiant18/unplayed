@@ -1,12 +1,13 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 import sys
 import time
 from game import Game
 import threading
 import pickle
-from PyQt6.QtCore import QTime
+from PyQt6.QtCore import QDateTime, QTime
 from PyQt6.QtWidgets import (
     QApplication,
+    QDateTimeEdit,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -30,6 +31,8 @@ class MainWindow(QMainWindow):
             self.config = pickle.load(file)
 
         # Tab 1
+
+        # next_mode
         self.combo = QComboBox()
         self.combo.addItems(["author", "gold", "silver", "bronze", "finished"])
         self.combo.setCurrentText(self.config["game_rules"]["next_mode"])
@@ -37,6 +40,7 @@ class MainWindow(QMainWindow):
             lambda val: self.on_input("next_mode", val)
         )
 
+        # track_limit
         self.track_spin = QSpinBox()
         self.track_spin.setMinimum(0)
         self.track_spin.setMaximum(1000)
@@ -45,19 +49,47 @@ class MainWindow(QMainWindow):
             lambda val: self.on_input("track_limit", val)
         )
 
+        # time_limit
         self.time_edit = QTimeEdit()
         self.time_edit.setDisplayFormat("HH:mm:ss")
-
         limit = int(self.config["game_rules"]["time_limit"].total_seconds())
         self.time_edit.setTime(QTime(0, 0, 0).addSecs(limit))
         self.time_edit.timeChanged.connect(lambda val: self.on_input("time_limit", val))
+
+        # site
+        self.site = QComboBox()
+        self.site.addItems(["TMUF-X", "TMNF-X", "TMO-X", "TMN-X", "TMS-X"])
+        self.site.setCurrentText(self.config["game_rules"]["site"])
+        self.site.currentTextChanged.connect(lambda val: self.on_input("site", val))
+
+        # uploadedafter
+        self.after = QDateTimeEdit()
+        self.after.setDisplayFormat("yyyy-MM-dd HH:mm:ss")
+        seconds = int(self.config["track_rules"]["uploadedafter"].timestamp())
+        self.after.setDateTime(QDateTime().fromSecsSinceEpoch(seconds))
+        self.after.dateTimeChanged.connect(
+            lambda val: self.on_input("uploadedafter", val)
+        )
+
+        # uploadedbefore
+        self.before = QDateTimeEdit()
+        self.before.setDisplayFormat("yyyy-MM-dd HH:mm:ss")
+        seconds = int(self.config["track_rules"]["uploadedbefore"].timestamp())
+        self.before.setDateTime(QDateTime().fromSecsSinceEpoch(seconds))
+        self.before.dateTimeChanged.connect(
+            lambda val: self.on_input("uploadedbefore", val)
+        )
+
+        dates = QHBoxLayout()
+        dates.addWidget(self.after)
+        dates.addWidget(self.before)
 
         self.start_button = QPushButton("Start")
         self.start_button.setStyleSheet("background-color: green")
         self.start_button.clicked.connect(self.start)
 
-        self.print_button = QPushButton("Print Config")
-        self.print_button.clicked.connect(self.stinky)
+        self.save_button = QPushButton("Save Config")
+        self.save_button.clicked.connect(self.save_config)
 
         main = QHBoxLayout()
         main.addWidget(self.combo)
@@ -66,8 +98,10 @@ class MainWindow(QMainWindow):
 
         tab = QVBoxLayout()
         tab.addLayout(main)
-        tab.addWidget(self.print_button)
+        tab.addWidget(self.site)
+        tab.addLayout(dates)
         tab.addWidget(self.start_button)
+        tab.addWidget(self.save_button)
         tab1 = QWidget()
         tab1.setLayout(tab)
 
@@ -132,7 +166,6 @@ class MainWindow(QMainWindow):
         self.stop_button.setEnabled(True)
         self.start_button.setEnabled(False)
 
-        self.config["track_rules"]["inhasrecord"] = None
         self.session = Game(self.config)
         threading.Thread(target=self.update_progress, daemon=True).start()
         self.session.start()
@@ -188,24 +221,33 @@ class MainWindow(QMainWindow):
         self.stop()
 
     def on_input(self, key, value):
-        if key == "time_limit":
-            print(value, type(value))
-            print(value.toPyTime())
-            self.config["game_rules"][key] = timedelta(
-                hours=value.hour(), minutes=value.minute(), seconds=value.second()
-            )
-            print(f"Widget {key} changed. new value: {value}")
+        if key in ["time_limit", "track_limit", "next_mode", "site"]:
+            if key == "time_limit":
+                print(value, type(value))
+                print(value.toPyTime())
+                self.config["game_rules"][key] = timedelta(
+                    hours=value.hour(), minutes=value.minute(), seconds=value.second()
+                )
+                print(f"Widget {key} changed. new value: {value}")
+            else:
+                self.config["game_rules"][key] = value
+                print(f"Widget {key} changed. new value: {value}")
         else:
-            self.config["game_rules"][key] = value
-            print(f"Widget {key} changed. new value: {value}")
+            print(value)
+            if key == "uploadedafter" or key == "uploadedbefore":
+                self.config["track_rules"][key] = datetime.fromtimestamp(
+                    value.toSecsSinceEpoch()
+                )
+                print(f"Widget {key} changed. new value: {value.toSecsSinceEpoch()}")
 
     def save_config(self):
         with open("config.bin", "wb") as file:
             pickle.dump(self.config, file)
 
 
-app = QApplication(sys.argv)
-window = MainWindow()
-window.show()
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
 
-app.exec()
+    app.exec()

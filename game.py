@@ -64,7 +64,7 @@ class Game:
         if self.time_limit.total_seconds() > 0:
             self.stop_time = self.start_time + self.time_limit
 
-        threading.Thread(target=get_tracks(self), daemon=True).start()
+        threading.Thread(target=get_tracks, args=(self,), daemon=True).start()
         threading.Thread(target=self.main, daemon=True).start()
 
         while not self.tracks and not self.fetching_done:
@@ -87,32 +87,29 @@ class Game:
 
     def main(self):
         while not self.stop_session:
-            if self.go_next:
-                self.current = self.next.get()
-                self.current.load(self.config["exe_path"])
-                self.go_next = False
-            time.sleep(0.1)
-
             if (
                 self.track_limit
                 and len(self.finished) >= 1
                 and len(self.finished) >= self.track_limit
             ):
                 print("\nTrack limit reached")
-                self.stop_session = True
+                self.stop()
             if self.stop_time and datetime.now() > self.stop_time:
                 print("\nTime limit reached")
-                self.stop_session = True
+                self.stop()
 
+            if self.go_next:
+                self.current = self.next.get()
+                self.current.load(self.config["exe_path"])
+                self.go_next = False
             time.sleep(0.1)
-        self.stop()
 
     def stop(self):
-        print("\nstop just got called")
         self.stop_session = True
         if self.observer:
             self.observer.stop()
             self.observer.join()
+
         self.save()
         self.data["autosaves"] = self.autosaves
         save_autosaves(self.data)
