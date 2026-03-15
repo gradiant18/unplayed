@@ -32,14 +32,19 @@ class MainWindow(QMainWindow):
         # Tab 1
 
         # next_mode
-        self.combo = QComboBox()
-        self.combo.addItems(["author", "gold", "silver", "bronze", "finished"])
-        self.combo.setCurrentText(self.config["game_rules"]["next_mode"])
-        self.combo.currentTextChanged.connect(
-            lambda val: self.on_input("next_mode", val)
+        self.mode_label = QLabel(text="Next Mode")
+        self.mode_combo = QComboBox()
+        self.mode_combo.addItems(["Author", "Gold", "Silver", "Bronze", "Finished"])
+        self.mode_combo.setCurrentText(self.config["game_rules"]["next_mode"])
+        self.mode_combo.currentTextChanged.connect(
+            lambda val: self.on_input("next_mode", val.lower())
         )
+        mode = QVBoxLayout()
+        mode.addWidget(self.mode_label)
+        mode.addWidget(self.mode_combo)
 
         # track_limit
+        self.track_label = QLabel(text="Track Limit")
         self.track_spin = QSpinBox()
         self.track_spin.setMinimum(0)
         self.track_spin.setMaximum(1000)
@@ -47,21 +52,69 @@ class MainWindow(QMainWindow):
         self.track_spin.valueChanged.connect(
             lambda val: self.on_input("track_limit", val)
         )
+        track = QVBoxLayout()
+        track.addWidget(self.track_label)
+        track.addWidget(self.track_spin)
 
         # time_limit
+        self.time_label = QLabel(text="Time Limit")
         self.time_edit = QTimeEdit()
         self.time_edit.setDisplayFormat("HH:mm:ss")
         limit = int(self.config["game_rules"]["time_limit"].total_seconds())
         self.time_edit.setTime(QTime(0, 0, 0).addSecs(limit))
         self.time_edit.timeChanged.connect(lambda val: self.on_input("time_limit", val))
+        tme = QVBoxLayout()
+        tme.addWidget(self.time_label)
+        tme.addWidget(self.time_edit)
 
         # site
+        self.site_label = QLabel(text="Site")
         self.site = QComboBox()
         self.site.addItems(["TMUF-X", "TMNF-X", "TMO-X", "TMN-X", "TMS-X"])
         self.site.setCurrentText(self.config["game_rules"]["site"])
         self.site.currentTextChanged.connect(lambda val: self.on_input("site", val))
+        site = QVBoxLayout()
+        site.addWidget(self.site_label)
+        site.addWidget(self.site)
+
+        # tag
+        self.tag_label = QLabel(text="Tag")
+        self.tag = QComboBox()
+        self.tmnf_tags = [
+            "None",
+            "Race",
+            "Stunt",
+            "Maze",
+            "Offroad",
+            "Multilap",
+            "FullSpeed",
+            "LOL",
+            "SpeedTech",
+            "RPG",
+            "PressForward",
+            "Trial",
+            "Grass",
+            "Story",
+            "Nascar",
+            "SpeedFun",
+            "Endurance",
+            "Altered Nadeo",
+            "Transitional",
+        ]
+        self.tag.addItems(self.tmnf_tags)
+        if self.config["track_rules"]["tag"] is not None:
+            self.tag.setCurrentText(
+                self.tmnf_tags[self.config["track_rules"]["tag"] + 1]
+            )
+        else:
+            self.tag.setCurrentText("None")
+        self.tag.currentTextChanged.connect(lambda val: self.on_input("tag", val))
+        tag = QVBoxLayout()
+        tag.addWidget(self.tag_label)
+        tag.addWidget(self.tag)
 
         # uploadedafter
+        self.after_label = QLabel(text="Uploaded After")
         self.after = QDateTimeEdit()
         self.after.setDisplayFormat("yyyy-MM-dd HH:mm:ss")
         seconds = int(self.config["track_rules"]["uploadedafter"].timestamp())
@@ -69,8 +122,12 @@ class MainWindow(QMainWindow):
         self.after.dateTimeChanged.connect(
             lambda val: self.on_input("uploadedafter", val)
         )
+        after = QVBoxLayout()
+        after.addWidget(self.after_label)
+        after.addWidget(self.after)
 
         # uploadedbefore
+        self.before_label = QLabel(text="Uploaded Before")
         self.before = QDateTimeEdit()
         self.before.setDisplayFormat("yyyy-MM-dd HH:mm:ss")
         seconds = int(self.config["track_rules"]["uploadedbefore"].timestamp())
@@ -78,28 +135,31 @@ class MainWindow(QMainWindow):
         self.before.dateTimeChanged.connect(
             lambda val: self.on_input("uploadedbefore", val)
         )
-
-        dates = QHBoxLayout()
-        dates.addWidget(self.after)
-        dates.addWidget(self.before)
+        before = QVBoxLayout()
+        before.addWidget(self.before_label)
+        before.addWidget(self.before)
 
         # authortimemin
+        self.at_min_label = QLabel(text="Minimum Author Time")
         self.at_min = QTimeEdit()
         self.at_min.setDisplayFormat("HH:mm:ss")
         min = self.config["track_rules"]["authortimemin"]
         self.at_min.setTime(QTime(0, 0, 0).fromMSecsSinceStartOfDay(min))
         self.at_min.timeChanged.connect(lambda val: self.on_input("authortimemin", val))
+        at_min = QVBoxLayout()
+        at_min.addWidget(self.at_min_label)
+        at_min.addWidget(self.at_min)
 
         # authortimemax
+        self.at_max_label = QLabel(text="Maximum Author Time")
         self.at_max = QTimeEdit()
         self.at_max.setDisplayFormat("HH:mm:ss")
         max = self.config["track_rules"]["authortimemax"]
         self.at_max.setTime(QTime(0, 0, 0).fromMSecsSinceStartOfDay(max))
         self.at_max.timeChanged.connect(lambda val: self.on_input("authortimemax", val))
-
-        ats = QHBoxLayout()
-        ats.addWidget(self.at_min)
-        ats.addWidget(self.at_max)
+        at_max = QVBoxLayout()
+        at_max.addWidget(self.at_max_label)
+        at_max.addWidget(self.at_max)
 
         self.start_button = QPushButton("Start")
         self.start_button.setStyleSheet("background-color: green")
@@ -109,15 +169,24 @@ class MainWindow(QMainWindow):
         self.save_button.clicked.connect(self.save_config)
 
         main = QHBoxLayout()
-        main.addWidget(self.combo)
-        main.addWidget(self.track_spin)
-        main.addWidget(self.time_edit)
+        main.addLayout(mode)
+        main.addLayout(track)
+        main.addLayout(tme)
+
+        main2 = QHBoxLayout()
+        main2.addLayout(site)
+        main2.addLayout(after)
+        main2.addLayout(before)
+
+        main3 = QHBoxLayout()
+        main3.addLayout(tag)
+        main3.addLayout(at_min)
+        main3.addLayout(at_max)
 
         tab = QVBoxLayout()
         tab.addLayout(main)
-        tab.addWidget(self.site)
-        tab.addLayout(ats)
-        tab.addLayout(dates)
+        tab.addLayout(main2)
+        tab.addLayout(main3)
         tab.addWidget(self.start_button)
         tab.addWidget(self.save_button)
         tab1 = QWidget()
@@ -167,17 +236,16 @@ class MainWindow(QMainWindow):
         tab2.setLayout(tab)
 
         self.tab_widget = QTabWidget()
-        self.tab_widget.addTab(tab1, "Tab 1")
-        self.tab_widget.addTab(tab2, "Tab 2")
+        self.tab_widget.addTab(tab1, "Config")
+        self.tab_widget.addTab(tab2, "Game")
         self.tab_widget.setTabEnabled(1, False)
 
         self.setCentralWidget(self.tab_widget)
-        self.test = None
+        self.setMinimumSize(self.minimumSizeHint())
+        self.setMaximumSize(self.minimumSizeHint())
+
         self.progress_timer = QTimer(self)
         self.progress_timer.timeout.connect(self.update_progress)
-
-    def stinky(self):
-        print(self.config)
 
     def start(self):
         self.stop_button.setStyleSheet("background-color: red")
@@ -264,6 +332,11 @@ class MainWindow(QMainWindow):
                 print(
                     f"Widget {key} changed. new value: {value.msecsSinceStartOfDay()}"
                 )
+            if key == "tag":
+                if value == "None":
+                    self.config["track_rules"][key] = None
+                else:
+                    self.config["track_rules"][key] = self.tmnf_tags.index(value) - 1
 
     def save_config(self):
         with open("config.bin", "wb") as file:
