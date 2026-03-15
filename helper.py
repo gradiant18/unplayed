@@ -4,10 +4,7 @@ import requests
 import time
 import re
 from concurrent.futures import ThreadPoolExecutor
-from itertools import repeat
 import pickle
-from test import timer
-import track
 
 
 def get_uid(path):

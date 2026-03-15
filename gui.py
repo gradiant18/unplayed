@@ -185,11 +185,7 @@ class MainWindow(QMainWindow):
         self.stop_button.setEnabled(True)
         self.start_button.setEnabled(False)
 
-        if len(sys.argv) == 2:
-            print("debug mode enabled")
-            self.config["debug"] = True
-        else:
-            self.config["debug"] = False
+        self.config["debug"] = len(sys.argv) == 2
 
         self.session = Game(self.config)
         self.progress_timer.start(100)
