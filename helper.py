@@ -6,19 +6,20 @@ import re
 from concurrent.futures import ThreadPoolExecutor
 from itertools import repeat
 import pickle
+from test import timer
+import track
 
 
 def get_uid(path):
-    data = "b''"
-    while data == "b''":
+    for _ in range(10):
         with open(path, "rb") as file:
-            data = str(file.read())
-
-    if not (match := re.search(r'uid="\w*"', data)):
-        print("no  uid for:", path)
-        print(data)
-        return None
-    return match.group()[5:-1]
+            data = file.read(4096)
+        if not data:
+            time.sleep(0.001)
+            continue
+        if match := re.search(rb'uid="(\w*)"', data):
+            return match.group(1).decode("utf-8")
+        time.sleep(0.001)
 
 
 def save_autosaves(data):
@@ -75,54 +76,56 @@ def get_session_url(session):
     return sites[session.site]
 
 
-def format_timedelta(td):
-    hours, remainder = divmod(td.seconds, 3600)
-    minutes, seconds = divmod(remainder, 60)
-    seconds += td.microseconds / 1e6
-    return f"{hours:02d}:{minutes:02d}:{int(seconds):02d}"
-
-
-def clean(session, track):
-    if track["UId"] in session.autosaves:
-        return
-    if track["TrackId"] in session.banned_tracks:
-        return
-    session.tracks.append(Track(track))
-
-
 def get_tracks(session):
     api_url = f"https://{get_session_url(session)}/api/tracks?"
     params = {
         "fields": "TrackId,TrackName,UId,AuthorTime,GoldTarget,SilverTarget,BronzeTarget",
         "count": 1000,
     }
-    for param, value in session.config["track_rules"].items():
+
+    for param, value in session.config.get("track_rules", {}).items():
         if value is not None:
             params[param] = value
 
+    banned_set = set(session.banned_tracks)
+    autosaves_set = session.autosaves
     current_last = 0
-    while not session.stop_session:
-        try:
-            params["after"] = current_last
-            response = requests.get(api_url, params=params, timeout=10)
-            data = response.json()
-            results = data.get("Results", [])
 
-            if not results:
-                break
+    with requests.Session() as http:
+        while not session.stop_session:
+            try:
+                params["after"] = current_last
+                response = http.get(api_url, params=params, timeout=10)
 
-            with ThreadPoolExecutor(max_workers=10) as exe:
-                exe.map(clean, repeat(session), results)
-            current_last = results[-1]["TrackId"]
+                response.raise_for_status()
 
-            if not data.get("More", False):
-                break
+                data = response.json()
+                results = data.get("Results", [])
 
-        except requests.exceptions.RequestException as e:
-            print(e)
-            time.sleep(1)
-            continue
+                if not results:
+                    break
+
+                valid_tracks = [
+                    Track(track)
+                    for track in results
+                    if track["UId"] not in autosaves_set
+                    and track["TrackId"] not in banned_set
+                ]
+
+                if valid_tracks:
+                    session.tracks.extend(valid_tracks)
+
+                current_last = results[-1]["TrackId"]
+
+                if not data.get("More", False):
+                    break
+
+            except requests.exceptions.RequestException as e:
+                print(f"API Error fetching tracks: {e}")
+                time.sleep(1)
+                continue
 
     session.fetching_done = True
-    if session.track_limit != session.config["game_rules"]["track_limit"]:
+    original_limit = session.config["game_rules"].get("track_limit")
+    if session.track_limit != original_limit:
         session.track_limit = len(session.tracks)

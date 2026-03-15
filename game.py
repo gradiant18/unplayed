@@ -8,7 +8,6 @@ from watchdog.observers import Observer
 from watchdog.events import PatternMatchingEventHandler
 from helper import (
     get_autosaves,
-    format_timedelta,
     get_tracks,
     get_uid,
     save_autosaves,
@@ -180,7 +179,11 @@ class Game:
 
     def get_time_left(self):
         if self.stop_time:
-            return format_timedelta(self.stop_time - datetime.now())
+            td = self.stop_time - datetime.now()
+            hours, remainder = divmod(td.seconds, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            seconds += td.microseconds / 1e6
+            return f"{hours:02d}:{minutes:02d}:{int(seconds):02d}"
         return None
 
     def get_current(self):
