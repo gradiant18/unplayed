@@ -57,6 +57,7 @@ class Game:
         self.fetching_done = False
         self.stop_session = False
         self.stopped = False
+        self.stop_reason = None
 
     def start(self):
         self.start_time = datetime.now()
@@ -70,8 +71,7 @@ class Game:
             time.sleep(0.1)
 
         if not self.tracks:
-            print("no tracks found matching your parameters")
-            self.stop()
+            self.stop("No Tracks Found")
             return
 
         if self.track_limit == 0:
@@ -105,8 +105,10 @@ class Game:
                 self.go_next = False
             time.sleep(0.1)
 
-    def stop(self):
+    def stop(self, reason=""):
         self.stop_session = True
+        if not self.stop_reason:
+            self.stop_reason = reason
         if self.observer:
             self.observer.stop()
             self.observer.join()

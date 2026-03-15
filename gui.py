@@ -273,6 +273,9 @@ class MainWindow(QMainWindow):
         self.session.stop()
         self.save_config()
 
+        if reason := self.session.stop_reason:
+            self.setWindowTitle(f"Randomizer | {reason}")
+
         self.stop_button.setStyleSheet("background-color: grey")
         self.start_button.setStyleSheet("background-color: green")
         self.stop_button.setEnabled(False)
