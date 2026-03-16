@@ -92,11 +92,11 @@ class Game:
                 and len(self.finished) >= self.track_limit
             ):
                 print("\nTrack limit reached")
-                self.stop()
+                self.stop("Track Limit Reached")
                 break
             if self.stop_time and datetime.now() > self.stop_time:
                 print("\nTime limit reached")
-                self.stop()
+                self.stop("Time Limit Reached")
                 break
 
             if self.go_next:

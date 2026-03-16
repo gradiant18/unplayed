@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 import sys
 import time
 from game import Game
+from exchange import sites
 import pickle
 from PyQt6.QtCore import QDateTime, QTime, QTimer
 from PyQt6.QtWidgets import (
@@ -37,7 +38,7 @@ class MainWindow(QMainWindow):
         self.mode_combo.addItems(["Author", "Gold", "Silver", "Bronze", "Finished"])
         self.mode_combo.setCurrentText(self.config["game_rules"]["next_mode"])
         self.mode_combo.currentTextChanged.connect(
-            lambda val: self.on_input("next_mode", val.lower())
+            lambda val: self.game_rule_changed("next_mode", val.lower())
         )
         mode = QVBoxLayout()
         mode.addWidget(self.mode_label)
@@ -50,7 +51,7 @@ class MainWindow(QMainWindow):
         self.track_spin.setMaximum(1000)
         self.track_spin.setValue(self.config["game_rules"]["track_limit"])
         self.track_spin.valueChanged.connect(
-            lambda val: self.on_input("track_limit", val)
+            lambda val: self.game_rule_changed("track_limit", val)
         )
         track = QVBoxLayout()
         track.addWidget(self.track_label)
@@ -62,7 +63,9 @@ class MainWindow(QMainWindow):
         self.time_edit.setDisplayFormat("HH:mm:ss")
         limit = int(self.config["game_rules"]["time_limit"].total_seconds())
         self.time_edit.setTime(QTime(0, 0, 0).addSecs(limit))
-        self.time_edit.timeChanged.connect(lambda val: self.on_input("time_limit", val))
+        self.time_edit.timeChanged.connect(
+            lambda val: self.game_rule_changed("time_limit", val)
+        )
         tme = QVBoxLayout()
         tme.addWidget(self.time_label)
         tme.addWidget(self.time_edit)
@@ -72,7 +75,9 @@ class MainWindow(QMainWindow):
         self.site = QComboBox()
         self.site.addItems(["TMUF-X", "TMNF-X", "TMO-X", "TMN-X", "TMS-X"])
         self.site.setCurrentText(self.config["game_rules"]["site"])
-        self.site.currentTextChanged.connect(lambda val: self.on_input("site", val))
+        self.site.currentTextChanged.connect(
+            lambda val: self.game_rule_changed("site", val)
+        )
         site = QVBoxLayout()
         site.addWidget(self.site_label)
         site.addWidget(self.site)
@@ -80,35 +85,15 @@ class MainWindow(QMainWindow):
         # tag
         self.tag_label = QLabel(text="Tag")
         self.tag = QComboBox()
-        self.tmnf_tags = [
-            "None",
-            "Race",
-            "Stunt",
-            "Maze",
-            "Offroad",
-            "Multilap",
-            "FullSpeed",
-            "LOL",
-            "SpeedTech",
-            "RPG",
-            "PressForward",
-            "Trial",
-            "Grass",
-            "Story",
-            "Nascar",
-            "SpeedFun",
-            "Endurance",
-            "Altered Nadeo",
-            "Transitional",
-        ]
-        self.tag.addItems(self.tmnf_tags)
-        if self.config["track_rules"]["tag"] is not None:
-            self.tag.setCurrentText(
-                self.tmnf_tags[self.config["track_rules"]["tag"] + 1]
-            )
+        self.tag.addItem("Any")
+        self.tag.addItems(sites[self.site.currentText()]["tags"])
+        if self.config["track_rules"]["tag"] is None:
+            self.tag.setCurrentText("Any")
         else:
-            self.tag.setCurrentText("None")
-        self.tag.currentTextChanged.connect(lambda val: self.on_input("tag", val))
+            self.tag.setCurrentIndex(self.config["track_rules"]["tag"] + 1)
+        self.tag.currentTextChanged.connect(
+            lambda val: self.track_rule_changed("tag", val)
+        )
         tag = QVBoxLayout()
         tag.addWidget(self.tag_label)
         tag.addWidget(self.tag)
@@ -120,7 +105,7 @@ class MainWindow(QMainWindow):
         seconds = int(self.config["track_rules"]["uploadedafter"].timestamp())
         self.after.setDateTime(QDateTime().fromSecsSinceEpoch(seconds))
         self.after.dateTimeChanged.connect(
-            lambda val: self.on_input("uploadedafter", val)
+            lambda val: self.track_rule_changed("uploadedafter", val)
         )
         after = QVBoxLayout()
         after.addWidget(self.after_label)
@@ -133,30 +118,34 @@ class MainWindow(QMainWindow):
         seconds = int(self.config["track_rules"]["uploadedbefore"].timestamp())
         self.before.setDateTime(QDateTime().fromSecsSinceEpoch(seconds))
         self.before.dateTimeChanged.connect(
-            lambda val: self.on_input("uploadedbefore", val)
+            lambda val: self.track_rule_changed("uploadedbefore", val)
         )
         before = QVBoxLayout()
         before.addWidget(self.before_label)
         before.addWidget(self.before)
 
         # authortimemin
-        self.at_min_label = QLabel(text="Minimum Author Time")
+        self.at_min_label = QLabel(text="Min AT")
         self.at_min = QTimeEdit()
         self.at_min.setDisplayFormat("HH:mm:ss")
         min = self.config["track_rules"]["authortimemin"]
         self.at_min.setTime(QTime(0, 0, 0).fromMSecsSinceStartOfDay(min))
-        self.at_min.timeChanged.connect(lambda val: self.on_input("authortimemin", val))
+        self.at_min.timeChanged.connect(
+            lambda val: self.track_rule_changed("authortimemin", val)
+        )
         at_min = QVBoxLayout()
         at_min.addWidget(self.at_min_label)
         at_min.addWidget(self.at_min)
 
         # authortimemax
-        self.at_max_label = QLabel(text="Maximum Author Time")
+        self.at_max_label = QLabel(text="Max AT")
         self.at_max = QTimeEdit()
         self.at_max.setDisplayFormat("HH:mm:ss")
         max = self.config["track_rules"]["authortimemax"]
         self.at_max.setTime(QTime(0, 0, 0).fromMSecsSinceStartOfDay(max))
-        self.at_max.timeChanged.connect(lambda val: self.on_input("authortimemax", val))
+        self.at_max.timeChanged.connect(
+            lambda val: self.track_rule_changed("authortimemax", val)
+        )
         at_max = QVBoxLayout()
         at_max.addWidget(self.at_max_label)
         at_max.addWidget(self.at_max)
@@ -248,12 +237,14 @@ class MainWindow(QMainWindow):
         self.progress_timer.timeout.connect(self.update_progress)
 
     def start(self):
+        self.setWindowTitle("Randomizer")
         self.stop_button.setStyleSheet("background-color: red")
         self.start_button.setStyleSheet("background-color: grey")
         self.stop_button.setEnabled(True)
         self.start_button.setEnabled(False)
 
         self.config["debug"] = len(sys.argv) == 2
+        self.config["track_rules"]["mood"] = None
 
         self.session = Game(self.config)
         self.progress_timer.start(100)
@@ -312,34 +303,42 @@ class MainWindow(QMainWindow):
         else:
             self.times.setText("          ")
 
-    def on_input(self, key, value):
-        if key in ["time_limit", "track_limit", "next_mode", "site"]:
-            # game_rules
-            if key == "time_limit":
-                self.config["game_rules"][key] = timedelta(
-                    hours=value.hour(), minutes=value.minute(), seconds=value.second()
-                )
-                print(f"Widget {key} changed. new value: {value}")
-            else:
-                self.config["game_rules"][key] = value
-                print(f"Widget {key} changed. new value: {value}")
+    def game_rule_changed(self, key, value):
+        if key == "time_limit":
+            self.config["game_rules"][key] = timedelta(
+                hours=value.hour(), minutes=value.minute(), seconds=value.second()
+            )
+        elif key == "site" and False:
+            old_val = self.config["game_rules"][key]
+            if value in ["TMUF-X", "TMNF-X"] and old_val not in [
+                "TMUF-X",
+                "TMNF-X",
+            ]:
+                # different tags
+                self.tag.setCurrentText("Any")
+                self.tag.clear()
+                self.tag.addItem("Any")
+                self.tag.addActions(sites[key]["tags"])
+                self.tag.setCurrentText("Any")
+                self.track_rule_changed("tag", "Any")
+
         else:
-            # track_rules
-            if key == "uploadedafter" or key == "uploadedbefore":
-                self.config["track_rules"][key] = datetime.fromtimestamp(
-                    value.toSecsSinceEpoch()
-                )
-                print(f"Widget {key} changed. new value: {value.toSecsSinceEpoch()}")
-            if key == "authortimemin" or key == "authortimemax":
-                self.config["track_rules"][key] = value.msecsSinceStartOfDay()
-                print(
-                    f"Widget {key} changed. new value: {value.msecsSinceStartOfDay()}"
-                )
-            if key == "tag":
-                if value == "None":
-                    self.config["track_rules"][key] = None
-                else:
-                    self.config["track_rules"][key] = self.tmnf_tags.index(value) - 1
+            self.config["game_rules"][key] = value
+
+    def track_rule_changed(self, key, value):
+        track_rule = self.config["track_rules"][key]
+        if key in ["authortimemin", "authortimemax"]:
+            track_rule = value.msecsSinceStartOfDay()
+        elif key in ["uploadedafter", "uploadedbefore"]:
+            track_rule = datetime.fromtimestamp(value.toSecsSinceEpoch())
+        elif key == "tag":
+            if value == "Any":
+                track_rule = None
+            else:
+                track_rule = sites[self.site.currentText()]["tags"].index(value)
+
+        self.config["track_rules"][key] = track_rule
+        print(f"{key} changed to {track_rule}")
 
     def save_config(self):
         with open("config.bin", "wb") as file:
