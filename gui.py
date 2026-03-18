@@ -92,55 +92,44 @@ class MainWindow(QMainWindow):
         site.addWidget(self.site)
 
         # tag
-        self.tag_check = QCheckBox(text="Style")
-        self.tag_check.setChecked(self.data["track_rules"]["tag"]["state"])
-        self.tag_check.stateChanged.connect(lambda val: self.check_changed("tag", val))
         self.tag = QComboBox()
         self.tag.addItems(sites[self.site.currentText()]["tags"])
         self.tag.setCurrentIndex(self.data["track_rules"]["tag"]["value"])
         self.tag.currentTextChanged.connect(
             lambda val: self.track_rule_changed("tag", val)
         )
+        self.tag_check = self.make_checkbox("Tag", "tag")
         tag = QVBoxLayout()
         tag.addWidget(self.tag_check)
         tag.addWidget(self.tag)
-        if self.data["track_rules"]["tag"]["state"] == 0:
-            self.tag.setEnabled(False)
-        else:
-            self.tag.setEnabled(True)
 
         # uploadedafter
-        self.after_label = QLabel(text="Uploaded After")
-        self.after = QDateTimeEdit()
-        self.after.setDisplayFormat("yyyy-MM-dd HH:mm:ss")
+        self.uploadedafter = QDateTimeEdit()
+        self.uploadedafter.setDisplayFormat("yyyy-MM-dd HH:mm:ss")
         seconds = int(self.data["track_rules"]["uploadedafter"]["value"].timestamp())
-        self.after.setDateTime(QDateTime().fromSecsSinceEpoch(seconds))
-        self.after.dateTimeChanged.connect(
+        self.uploadedafter.setDateTime(QDateTime().fromSecsSinceEpoch(seconds))
+        self.uploadedafter.dateTimeChanged.connect(
             lambda val: self.track_rule_changed("uploadedafter", val)
         )
+        self.after_box = self.make_checkbox("Uploaded After", "uploadedafter")
         after = QVBoxLayout()
-        after.addWidget(self.after_label)
-        after.addWidget(self.after)
+        after.addWidget(self.after_box)
+        after.addWidget(self.uploadedafter)
 
         # uploadedbefore
-        self.before_label = QLabel(text="Uploaded Before")
-        self.before = QDateTimeEdit()
-        self.before.setDisplayFormat("yyyy-MM-dd HH:mm:ss")
+        self.uploadedbefore = QDateTimeEdit()
+        self.uploadedbefore.setDisplayFormat("yyyy-MM-dd HH:mm:ss")
         seconds = int(self.data["track_rules"]["uploadedbefore"]["value"].timestamp())
-        self.before.setDateTime(QDateTime().fromSecsSinceEpoch(seconds))
-        self.before.dateTimeChanged.connect(
+        self.uploadedbefore.setDateTime(QDateTime().fromSecsSinceEpoch(seconds))
+        self.uploadedbefore.dateTimeChanged.connect(
             lambda val: self.track_rule_changed("uploadedbefore", val)
         )
+        self.before_box = self.make_checkbox("Uploaded Before", "uploadedbefore")
         before = QVBoxLayout()
-        before.addWidget(self.before_label)
-        before.addWidget(self.before)
+        before.addWidget(self.before_box)
+        before.addWidget(self.uploadedbefore)
 
         # authortimemin
-        self.at_min_check = QCheckBox(text="Min AT")
-        self.at_min_check.setChecked(self.data["track_rules"]["authortimemin"]["state"])
-        self.at_min_check.stateChanged.connect(
-            lambda val: self.check_changed("authortimemin", val)
-        )
         self.authortimemin = QTimeEdit()
         self.authortimemin.setDisplayFormat("HH:mm:ss")
         min = self.data["track_rules"]["authortimemin"]["value"]
@@ -148,20 +137,12 @@ class MainWindow(QMainWindow):
         self.authortimemin.timeChanged.connect(
             lambda val: self.track_rule_changed("authortimemin", val)
         )
-        if self.data["track_rules"]["authortimemin"]["state"] == 0:
-            self.authortimemin.setEnabled(False)
-        else:
-            self.authortimemin.setEnabled(True)
+        self.authortimemin_check = self.make_checkbox("Min AT", "authortimemin")
         at_min = QVBoxLayout()
-        at_min.addWidget(self.at_min_check)
+        at_min.addWidget(self.authortimemin_check)
         at_min.addWidget(self.authortimemin)
 
         # authortimemax
-        self.at_max_check = QCheckBox(text="Max AT")
-        self.at_max_check.setChecked(self.data["track_rules"]["authortimemax"]["state"])
-        self.at_max_check.stateChanged.connect(
-            lambda val: self.check_changed("authortimemax", val)
-        )
         self.authortimemax = QTimeEdit()
         self.authortimemax.setDisplayFormat("HH:mm:ss")
         max = self.data["track_rules"]["authortimemax"]["value"]
@@ -169,12 +150,9 @@ class MainWindow(QMainWindow):
         self.authortimemax.timeChanged.connect(
             lambda val: self.track_rule_changed("authortimemax", val)
         )
-        if self.data["track_rules"]["authortimemax"]["state"] == 0:
-            self.authortimemax.setEnabled(False)
-        else:
-            self.authortimemax.setEnabled(True)
+        self.authortimemax_check = self.make_checkbox("Max AT", "authortimemax")
         at_max = QVBoxLayout()
-        at_max.addWidget(self.at_max_check)
+        at_max.addWidget(self.authortimemax_check)
         at_max.addWidget(self.authortimemax)
 
         self.start_button = QPushButton("Start")
@@ -263,11 +241,19 @@ class MainWindow(QMainWindow):
         self.progress_timer = QTimer(self)
         self.progress_timer.timeout.connect(self.update_progress)
 
+    def make_checkbox(self, text, label):
+        checkbox = QCheckBox(text)
+        checkbox.setChecked(self.data["track_rules"][label]["state"])
+        checkbox.stateChanged.connect(lambda state: self.check_changed(label, state))
+        param = getattr(self, label, None)
+        if param is not None:
+            param.setEnabled(checkbox.isChecked())
+        return checkbox
+
     def check_changed(self, key, state):
-        if state == 0:
-            eval(f"self.{key}.setEnabled(False)")
-        else:
-            eval(f"self.{key}.setEnabled(True)")
+        param = getattr(self, key, None)
+        if param is not None:
+            param.setEnabled(state == 2)
         self.data["track_rules"][key]["state"] = state
 
     def create_config(self):
