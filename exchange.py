@@ -22,7 +22,7 @@ sites = {
             "Altered Nadeo",
             "Transitional",
         ],
-        "types": ["Race", "Puzzle", "Platform", "Stunts", "Shortcut", "Laps"],
+        "primarytypes": ["Race", "Puzzle", "Platform", "Stunts", "Shortcut", "Laps"],
         "environments": [
             "",
             "Snow",
@@ -33,6 +33,7 @@ sites = {
             "Bay",
             "Stadium",
         ],
+        "moods": ["Sunrise", "Day", "Sunset", "Night"],
     },
     "TMNF-X": {
         "url": "tmnf.exchange",
@@ -57,8 +58,9 @@ sites = {
             "Altered Nadeo",
             "Transitional",
         ],
-        "types": ["Race", "Puzzle", "Platform", "Stunts", "Shortcut", "Laps"],
+        "primarytypes": ["Race", "Puzzle", "Platform", "Stunts", "Shortcut", "Laps"],
         "environments": ["", "", "", "", "", "", "", "Stadium"],
+        "moods": ["Sunrise", "Day", "Sunset", "Night"],
     },
     "TMO-X": {
         "url": "original.tm-exchange.com",
@@ -77,8 +79,9 @@ sites = {
             "Trial",
             "Grass",
         ],
-        "types": ["Race", "Puzzle", "Platform", "Stunts", "Shortcut", "Laps"],
+        "primarytypes": ["Race", "Puzzle", "Platform", "Stunts", "Shortcut", "Laps"],
         "environments": ["", "Snow", "Desert", "Rally"],
+        "moods": ["Sunrise", "Day", "Sunset", "Night"],
     },
     "TMS-X": {
         "url": "sunrise.tm-exchange.com",
@@ -97,8 +100,9 @@ sites = {
             "Trial",
             "Grass",
         ],
-        "types": ["Race", "Puzzle", "Platform", "Stunts", "Shortcut", "Laps"],
+        "primarytypes": ["Race", "Puzzle", "Platform", "Stunts", "Shortcut", "Laps"],
         "environments": ["", "", "", "", "Island", "Coast", "Bay"],
+        "moods": ["Sunrise", "Day", "Sunset", "Night"],
     },
     "TMN-X": {
         "url": "nations.tm-exchange.com",
@@ -117,7 +121,8 @@ sites = {
             "Trial",
             "Grass",
         ],
-        "types": ["Race", "Puzzle", "Platform", "Stunts", "Shortcut", "Laps"],
+        "primarytypes": ["Race", "Puzzle", "Platform", "Stunts", "Shortcut", "Laps"],
         "environments": ["", "", "", "", "", "", "", "Stadium"],
+        "moods": ["Sunrise", "Day", "Sunset", "Night"],
     },
 }

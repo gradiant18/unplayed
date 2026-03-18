@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import copy
+from math import comb
 import sys
 import os
 import time
@@ -36,8 +37,6 @@ class MainWindow(QMainWindow):
                 self.data = pickle.load(file)
         else:
             self.data = data
-
-        print(self.data)
 
         # Tab 1
 
@@ -91,18 +90,6 @@ class MainWindow(QMainWindow):
         site.addWidget(self.site_label)
         site.addWidget(self.site)
 
-        # tag
-        self.tag = QComboBox()
-        self.tag.addItems(sites[self.site.currentText()]["tags"])
-        self.tag.setCurrentIndex(self.data["track_rules"]["tag"]["value"])
-        self.tag.currentTextChanged.connect(
-            lambda val: self.track_rule_changed("tag", val)
-        )
-        self.tag_check = self.make_checkbox("Tag", "tag")
-        tag = QVBoxLayout()
-        tag.addWidget(self.tag_check)
-        tag.addWidget(self.tag)
-
         # uploadedafter
         self.uploadedafter = QDateTimeEdit()
         self.uploadedafter.setDisplayFormat("yyyy-MM-dd HH:mm:ss")
@@ -155,6 +142,39 @@ class MainWindow(QMainWindow):
         at_max.addWidget(self.authortimemax_check)
         at_max.addWidget(self.authortimemax)
 
+        # tag
+        self.tag = self.make_combobox("tag")
+        self.tag_check = self.make_checkbox("Tag", "tag")
+        tag = QVBoxLayout()
+        tag.addWidget(self.tag_check)
+        tag.addWidget(self.tag)
+
+        # primarytype
+        self.primarytype = self.make_combobox("primarytype")
+        self.primarytype_check = self.make_checkbox("Style", "primarytype")
+        primarytype = QVBoxLayout()
+        primarytype.addWidget(self.primarytype_check)
+        primarytype.addWidget(self.primarytype)
+
+        # environment
+        self.environment = self.make_combobox("environment")
+        self.environment_check = self.make_checkbox("Environment", "environment")
+        environment = QVBoxLayout()
+        environment.addWidget(self.environment_check)
+        environment.addWidget(self.environment)
+
+        # mood
+        self.mood = self.make_combobox("mood")
+        self.mood_check = self.make_checkbox("Mood", "mood")
+        mood = QVBoxLayout()
+        mood.addWidget(self.mood_check)
+        mood.addWidget(self.mood)
+
+        # difficulty
+        # inhasrecord
+        # inunlimiter
+        # inauthortimebeaten
+
         self.start_button = QPushButton("Start")
         self.start_button.setStyleSheet("background-color: green")
         self.start_button.clicked.connect(self.start)
@@ -177,10 +197,16 @@ class MainWindow(QMainWindow):
         main3.addLayout(at_min)
         main3.addLayout(at_max)
 
+        main4 = QHBoxLayout()
+        main4.addLayout(primarytype)
+        main4.addLayout(environment)
+        main4.addLayout(mood)
+
         tab = QVBoxLayout()
         tab.addLayout(main)
         tab.addLayout(main2)
         tab.addLayout(main3)
+        tab.addLayout(main4)
         tab.addWidget(self.start_button)
         tab.addWidget(self.save_button)
         tab1 = QWidget()
@@ -250,6 +276,51 @@ class MainWindow(QMainWindow):
             param.setEnabled(checkbox.isChecked())
         return checkbox
 
+    def make_combobox(self, label):
+        combo = QComboBox()
+        site_items = sites[self.site.currentText()].get(f"{label}s")
+        if not site_items:
+            return combo
+        items = [item for item in site_items if item != ""]
+        combo.addItems(items)
+
+        text = self.data["track_rules"][label]["text"]
+        if text in items:
+            combo.setCurrentText(text)
+            self.data["track_rules"][label]["value"] = site_items.index(text)
+        else:
+            combo.setCurrentText(items[0])
+            self.data["track_rules"][label]["value"] = site_items.index(items[0])
+            self.data["track_rules"][label]["text"] = items[0]
+        combo.currentTextChanged.connect(
+            lambda val: self.track_rule_changed(label, val)
+        )
+        return combo
+
+    def update_combobox(self, label):
+        combo = getattr(self, label, None)
+        site_items = sites[self.site.currentText()].get(f"{label}s")
+        if combo is None or not site_items:
+            return
+        combo.currentTextChanged.disconnect()
+        items = [item for item in site_items if item != ""]
+        combo.clear()
+        combo.addItems(items)
+
+        text = self.data["track_rules"][label]["text"]
+        if text in items:
+            # keep same choice
+            combo.setCurrentText(text)
+            self.data["track_rules"][label]["value"] = site_items.index(text)
+        else:
+            # set to default choice
+            combo.setCurrentText(items[0])
+            self.data["track_rules"][label]["value"] = site_items.index(items[0])
+            self.data["track_rules"][label]["text"] = items[0]
+        combo.currentTextChanged.connect(
+            lambda val: self.track_rule_changed(label, val)
+        )
+
     def check_changed(self, key, state):
         param = getattr(self, key, None)
         if param is not None:
@@ -264,7 +335,7 @@ class MainWindow(QMainWindow):
                 config["track_rules"][rule] = self.data["track_rules"][rule]["value"]
             else:
                 config["track_rules"][rule] = None
-        print(f"{config = }\n{self.data = }")
+        # print(f"{config = }\n{self.data = }")
         return config
 
     def start(self):
@@ -338,6 +409,10 @@ class MainWindow(QMainWindow):
             self.data["game_rules"][key] = timedelta(
                 hours=value.hour(), minutes=value.minute(), seconds=value.second()
             )
+        elif key == "site":
+            self.data["game_rules"][key] = value
+            for param in ["tag", "primarytype", "environment", "mood"]:
+                self.update_combobox(param)
         else:
             self.data["game_rules"][key] = value
 
@@ -347,17 +422,16 @@ class MainWindow(QMainWindow):
             track_rule = value.msecsSinceStartOfDay()
         elif key in ["uploadedafter", "uploadedbefore"]:
             track_rule = datetime.fromtimestamp(value.toSecsSinceEpoch())
-        elif key == "tag":
-            if value == "Any":
-                track_rule = None
-            else:
-                track_rule = sites[self.site.currentText()]["tags"].index(value)
+        elif key in ["tag", "primarytype", "environment", "mood"]:
+            track_rule = sites[self.site.currentText()][f"{key}s"].index(value)
+            self.data["track_rules"][key]["text"] = sites[self.site.currentText()][
+                f"{key}s"
+            ][track_rule]
 
         self.data["track_rules"][key]["value"] = track_rule
         print(f"{key} changed to {track_rule}")
 
     def save_config(self):
-        print(self.data)
         with open("data.bin", "wb") as file:
             pickle.dump(self.data, file)
 

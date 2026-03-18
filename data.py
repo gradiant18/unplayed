@@ -10,21 +10,17 @@ data = {
         "site": "TMNF-X",
     },
     "track_rules": {
-        "tag": {
-            "state": 0,
-            "value": 3,
-        },
-        "primarytype": {
-            "state": 0,
-            "value": None,
-        },
+        "tag": {"state": 0, "value": 0, "text": "Race"},
+        "primarytype": {"state": 0, "value": 0, "text": "Race"},
+        "environment": {"state": 0, "value": 7, "text": "Stadium"},
+        "mood": {"state": 0, "value": 1, "text": "Day"},
         "uploadedafter": {
             "state": 2,
             "value": datetime.datetime(2010, 2, 1, 0, 0, 0),
         },
         "uploadedbefore": {
             "state": 2,
-            "value": datetime.datetime(2010, 2, 28, 0, 0, 0),
+            "value": datetime.datetime(2010, 2, 28, 23, 59, 59),
         },
         "authortimemin": {
             "state": 0,
@@ -34,17 +30,9 @@ data = {
             "state": 2,
             "value": 82000,
         },
-        "environment": {
-            "state": 0,
-            "value": None,
-        },
-        "mood": {
-            "state": 0,
-            "value": None,
-        },
         "difficulty": {
             "state": 0,
-            "value": None,
+            "value": 0,
         },
         "inhasrecord": {
             "state": 2,
@@ -52,15 +40,15 @@ data = {
         },
         "inunlimiter": {
             "state": 0,
-            "value": None,
+            "value": 0,
         },
         "unlimiterver": {
             "state": 0,
-            "value": None,
+            "value": 0,
         },
         "inauthortimebeaten": {
             "state": 0,
-            "value": None,
+            "value": 0,
         },
     },
 }
