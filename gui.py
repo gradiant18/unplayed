@@ -171,7 +171,17 @@ class MainWindow(QMainWindow):
         mood.addWidget(self.mood)
 
         # difficulty
+        self.difficulty = self.make_combobox("difficulty")
+        self.difficulty_check = self.make_checkbox("Difficulty", "difficulty")
+        difficulty = QVBoxLayout()
+        difficulty.addWidget(self.difficulty_check)
+        difficulty.addWidget(self.difficulty)
         # inhasrecord
+        self.inhasrecord = self.make_combobox("inhasrecord")
+        self.inhasrecord_check = self.make_checkbox("Records", "inhasrecord")
+        inhasrecord = QVBoxLayout()
+        inhasrecord.addWidget(self.inhasrecord_check)
+        inhasrecord.addWidget(self.inhasrecord)
         # inunlimiter
         # inauthortimebeaten
 
@@ -202,11 +212,16 @@ class MainWindow(QMainWindow):
         main4.addLayout(environment)
         main4.addLayout(mood)
 
+        main5 = QHBoxLayout()
+        main5.addLayout(difficulty)
+        main5.addLayout(inhasrecord)
+
         tab = QVBoxLayout()
         tab.addLayout(main)
         tab.addLayout(main2)
         tab.addLayout(main3)
         tab.addLayout(main4)
+        tab.addLayout(main5)
         tab.addWidget(self.start_button)
         tab.addWidget(self.save_button)
         tab1 = QWidget()
@@ -411,7 +426,7 @@ class MainWindow(QMainWindow):
             )
         elif key == "site":
             self.data["game_rules"][key] = value
-            for param in ["tag", "primarytype", "environment", "mood"]:
+            for param in ["tag", "primarytype", "environment"]:
                 self.update_combobox(param)
         else:
             self.data["game_rules"][key] = value
@@ -422,7 +437,14 @@ class MainWindow(QMainWindow):
             track_rule = value.msecsSinceStartOfDay()
         elif key in ["uploadedafter", "uploadedbefore"]:
             track_rule = datetime.fromtimestamp(value.toSecsSinceEpoch())
-        elif key in ["tag", "primarytype", "environment", "mood"]:
+        elif key in [
+            "tag",
+            "primarytype",
+            "environment",
+            "mood",
+            "difficulty",
+            "inhasrecord",
+        ]:
             track_rule = sites[self.site.currentText()][f"{key}s"].index(value)
             self.data["track_rules"][key]["text"] = sites[self.site.currentText()][
                 f"{key}s"

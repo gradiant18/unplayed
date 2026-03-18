@@ -10,10 +10,6 @@ data = {
         "site": "TMNF-X",
     },
     "track_rules": {
-        "tag": {"state": 0, "value": 0, "text": "Race"},
-        "primarytype": {"state": 0, "value": 0, "text": "Race"},
-        "environment": {"state": 0, "value": 7, "text": "Stadium"},
-        "mood": {"state": 0, "value": 1, "text": "Day"},
         "uploadedafter": {
             "state": 2,
             "value": datetime.datetime(2010, 2, 1, 0, 0, 0),
@@ -30,14 +26,12 @@ data = {
             "state": 2,
             "value": 82000,
         },
-        "difficulty": {
-            "state": 0,
-            "value": 0,
-        },
-        "inhasrecord": {
-            "state": 2,
-            "value": 0,
-        },
+        "tag": {"state": 0, "value": 0, "text": "Race"},
+        "primarytype": {"state": 0, "value": 0, "text": "Race"},
+        "environment": {"state": 0, "value": 7, "text": "Stadium"},
+        "mood": {"state": 0, "value": 1, "text": "Day"},
+        "difficulty": {"state": 0, "value": 0, "text": "Beginner"},
+        "inhasrecord": {"state": 2, "value": 0, "text": "No Records"},
         "inunlimiter": {
             "state": 0,
             "value": 0,

@@ -34,6 +34,8 @@ sites = {
             "Stadium",
         ],
         "moods": ["Sunrise", "Day", "Sunset", "Night"],
+        "inhasrecords": ["No Records", "Has Records"],
+        "difficultys": ["Beginner", "Intermediate", "Expert", "Lunatic"],
     },
     "TMNF-X": {
         "url": "tmnf.exchange",
@@ -61,6 +63,8 @@ sites = {
         "primarytypes": ["Race", "Puzzle", "Platform", "Stunts", "Shortcut", "Laps"],
         "environments": ["", "", "", "", "", "", "", "Stadium"],
         "moods": ["Sunrise", "Day", "Sunset", "Night"],
+        "inhasrecords": ["No Records", "Has Records"],
+        "difficultys": ["Beginner", "Intermediate", "Expert", "Lunatic"],
     },
     "TMO-X": {
         "url": "original.tm-exchange.com",
@@ -82,6 +86,8 @@ sites = {
         "primarytypes": ["Race", "Puzzle", "Platform", "Stunts", "Shortcut", "Laps"],
         "environments": ["", "Snow", "Desert", "Rally"],
         "moods": ["Sunrise", "Day", "Sunset", "Night"],
+        "inhasrecords": ["No Records", "Has Records"],
+        "difficultys": ["Beginner", "Intermediate", "Expert", "Lunatic"],
     },
     "TMS-X": {
         "url": "sunrise.tm-exchange.com",
@@ -103,6 +109,8 @@ sites = {
         "primarytypes": ["Race", "Puzzle", "Platform", "Stunts", "Shortcut", "Laps"],
         "environments": ["", "", "", "", "Island", "Coast", "Bay"],
         "moods": ["Sunrise", "Day", "Sunset", "Night"],
+        "inhasrecords": ["No Records", "Has Records"],
+        "difficultys": ["Beginner", "Intermediate", "Expert", "Lunatic"],
     },
     "TMN-X": {
         "url": "nations.tm-exchange.com",
@@ -124,5 +132,7 @@ sites = {
         "primarytypes": ["Race", "Puzzle", "Platform", "Stunts", "Shortcut", "Laps"],
         "environments": ["", "", "", "", "", "", "", "Stadium"],
         "moods": ["Sunrise", "Day", "Sunset", "Night"],
+        "inhasrecords": ["No Records", "Has Records"],
+        "difficultys": ["Beginner", "Intermediate", "Expert", "Lunatic"],
     },
 }
