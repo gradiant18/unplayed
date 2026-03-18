@@ -18,7 +18,6 @@ class Track:
             "bronze": track["BronzeTarget"],
         }
         self.medal = None
-        self.time = None
 
     def update_medal(self, replay_path):
         if not (ghost := Gbx(replay_path).get_class_by_id(GbxType.CTN_GHOST)):
@@ -38,7 +37,6 @@ class Track:
             "--appid",
             "7200",
             exe_path,
-            "/useexedir",
             "/singleinst",
             f"/file={self.path}",
         ]

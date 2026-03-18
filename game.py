@@ -1,9 +1,8 @@
-import json
+from datetime import datetime
+from queue import Queue
 import random
 import threading
 import time
-from datetime import datetime
-from queue import Queue
 from watchdog.observers import Observer
 from watchdog.events import PatternMatchingEventHandler
 from helper import (
@@ -32,7 +31,7 @@ class Game:
 
         self.start_time = datetime.now()
         self.stop_time = None
-        self.time_limit = config["game_rules"].get("time_limit")  # timedelta
+        self.time_limit = config["game_rules"].get("time_limit")
         self.track_limit = config["game_rules"].get("track_limit")
         self.mode = config["game_rules"].get("next_mode", "author")
         self.site = config["game_rules"].get("site", "TMNF-X")
@@ -46,7 +45,7 @@ class Game:
         )
 
         self.tracks = []
-        self.finished = []
+        self.finished = set()
         self.data = get_autosaves(self)
         self.autosaves = self.data["autosaves"]
 
@@ -103,7 +102,7 @@ class Game:
                 self.current = self.next.get()
                 self.current.load(self.config["exe_path"], self.config["debug"])
                 self.go_next = False
-            time.sleep(0.1)
+            time.sleep(0.01)
 
     def stop(self, reason=""):
         self.stop_session = True
@@ -113,7 +112,6 @@ class Game:
             self.observer.stop()
             self.observer.join()
 
-        self.save()
         self.data["autosaves"] = self.autosaves
         save_autosaves(self.data)
         self.stopped = True
@@ -140,6 +138,9 @@ class Game:
         replay_uid = get_uid(replay_path)
         if self.current.uid != replay_uid:
             return
+        if self.current in self.autosaves:
+            print(f"might be uid clash: {self.current.uid}")
+            return
 
         replay_time = self.current.update_medal(replay_path)
         if self.mode != "finished":
@@ -147,32 +148,11 @@ class Game:
                 return
 
         self.autosaves.add(replay_uid)
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        self.current.time = timestamp
-
-        if len(self.finished) == 0:
-            self.finished.append(self.current.__dict__)
-        else:
-            added = False
-            for track in self.finished:
-                if self.current.uid == track["uid"]:
-                    added = True
-                    break
-            if not added:
-                self.finished.append(self.current.__dict__)
-
-        self.save()
+        self.finished.add(self.current)
         self.data["autosaves"] = self.autosaves
         save_autosaves(self.data)
         if len(self.tracks) >= 0 and not self.stop_session:
             self.go_next = True
-
-    def save(self):
-        if len(self.finished) == 0 and not self.config.get("save_empty"):
-            return
-        timestamp = self.start_time.strftime("%Y-%m-%d_%H-%M-%S")
-        with open(f"sessions/{timestamp}.json", "w") as file:
-            json.dump(self.finished, file, indent=2)
 
     def get_tracks_left(self):
         if self.track_limit:

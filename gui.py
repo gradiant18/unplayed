@@ -1,13 +1,12 @@
-from datetime import datetime, timedelta
 import copy
-from math import comb
-import sys
 import os
-import time
-from game import Game
-from exchange import sites
-from data import data
 import pickle
+import sys
+import time
+from datetime import datetime, timedelta
+from default_data import data
+from exchange import sites
+from game import Game
 from PyQt6.QtCore import QDateTime, QTime, QTimer
 from PyQt6.QtWidgets import (
     QApplication,
@@ -32,8 +31,9 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Randomizer")
 
-        if os.path.exists("data.bin"):
-            with open("data.bin", "rb") as file:
+        path = os.path.join("binaries", "data.bin")
+        if os.path.exists(path):
+            with open(path, "rb") as file:
                 self.data = pickle.load(file)
         else:
             self.data = data
@@ -454,7 +454,8 @@ class MainWindow(QMainWindow):
         print(f"{key} changed to {track_rule}")
 
     def save_config(self):
-        with open("data.bin", "wb") as file:
+        path = os.path.join("binaries", "data.bin")
+        with open(path, "wb") as file:
             pickle.dump(self.data, file)
 
 

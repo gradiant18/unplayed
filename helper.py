@@ -20,18 +20,18 @@ def get_uid(path):
 
 
 def save_autosaves(data):
-    with open("auto.bin", "wb") as file:
+    path = os.path.join("binaries", "autosaves.bin")
+    with open(path, "wb") as file:
         pickle.dump(data, file)
 
 
 def load():
-    if not os.path.exists("auto.bin"):
-        print("auto.bin doesn't exist")
+    path = os.path.join("binaries", "autosaves.bin")
+    if not os.path.exists(path):
         return {"oldest": 0, "autosaves": None}
-    with open("auto.bin", "rb") as file:
+    with open(path, "rb") as file:
         data = pickle.load(file)
     if not data:
-        print("data isn't real")
         data = {"oldest": 0, "autosaves": None}
     return data
 
