@@ -1,4 +1,5 @@
 import os
+import platform
 from pygbx import Gbx, GbxType
 import requests
 import subprocess
@@ -32,14 +33,21 @@ class Track:
 
     # TODO: make not os/program dependent
     def load(self, exe_path, debug):
-        command = [
-            "protontricks-launch",
-            "--appid",
-            "7200",
-            exe_path,
-            "/singleinst",
-            f"/file={self.path}",
-        ]
+        if platform.system() == "Windows":
+            command = [
+                exe_path,
+                "/singleinst",
+                f"/file={self.path}",
+            ]
+        else:
+            command = [
+                "protontricks-launch",
+                "--appid",
+                "7200",
+                exe_path,
+                "/singleinst",
+                f"/file={self.path}",
+            ]
 
         if not debug:
             subprocess.run(command)
