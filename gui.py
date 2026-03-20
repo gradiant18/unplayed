@@ -176,14 +176,31 @@ class MainWindow(QMainWindow):
         difficulty = QVBoxLayout()
         difficulty.addWidget(self.difficulty_check)
         difficulty.addWidget(self.difficulty)
+
         # inhasrecord
         self.inhasrecord = self.make_combobox("inhasrecord")
         self.inhasrecord_check = self.make_checkbox("Records", "inhasrecord")
         inhasrecord = QVBoxLayout()
         inhasrecord.addWidget(self.inhasrecord_check)
         inhasrecord.addWidget(self.inhasrecord)
+
         # inunlimiter
-        # inauthortimebeaten
+        self.unlimiterver = self.make_combobox("unlimiterver")
+        self.inunlimeter_check = self.make_checkbox("Unlimiter", "unlimiterver")
+        if self.inunlimeter_check.checkState().value == 2:
+            self.data["track_rules"]["inunlimiter"]["state"] = 2
+            self.data["track_rules"]["inunlimiter"]["value"] = 1
+        else:
+            self.data["track_rules"]["inunlimiter"]["state"] = 0
+            self.data["track_rules"]["inunlimiter"]["value"] = 0
+        if self.data["track_rules"]["unlimiterver"]["text"] == "Any":
+            self.data["track_rules"]["unlimiterver"]["state"] = 0
+        else:
+            self.data["track_rules"]["unlimiterver"]["state"] = 2
+
+        unlimiter = QVBoxLayout()
+        unlimiter.addWidget(self.inunlimeter_check)
+        unlimiter.addWidget(self.unlimiterver)
 
         self.start_button = QPushButton("Start")
         self.start_button.setStyleSheet("background-color: green")
@@ -215,6 +232,7 @@ class MainWindow(QMainWindow):
         main5 = QHBoxLayout()
         main5.addLayout(difficulty)
         main5.addLayout(inhasrecord)
+        main5.addLayout(unlimiter)
 
         tab = QVBoxLayout()
         tab.addLayout(main)
@@ -282,7 +300,7 @@ class MainWindow(QMainWindow):
         self.progress_timer = QTimer(self)
         self.progress_timer.timeout.connect(self.update_progress)
 
-    def make_checkbox(self, text, label):
+    def make_checkbox(self, text, label) -> QCheckBox:
         checkbox = QCheckBox(text)
         checkbox.setChecked(self.data["track_rules"][label]["state"])
         checkbox.stateChanged.connect(lambda state: self.check_changed(label, state))
@@ -291,7 +309,7 @@ class MainWindow(QMainWindow):
             param.setEnabled(checkbox.isChecked())
         return checkbox
 
-    def make_combobox(self, label):
+    def make_combobox(self, label) -> QComboBox:
         combo = QComboBox()
         site_items = sites[self.site.currentText()].get(f"{label}s")
         if not site_items:
@@ -312,7 +330,7 @@ class MainWindow(QMainWindow):
         )
         return combo
 
-    def update_combobox(self, label):
+    def update_combobox(self, label) -> None:
         combo = getattr(self, label, None)
         site_items = sites[self.site.currentText()].get(f"{label}s")
         if combo is None or not site_items:
@@ -336,13 +354,25 @@ class MainWindow(QMainWindow):
             lambda val: self.track_rule_changed(label, val)
         )
 
-    def check_changed(self, key, state):
+    def check_changed(self, key, state) -> None:
         param = getattr(self, key, None)
         if param is not None:
             param.setEnabled(state == 2)
+        if key == "unlimiterver":
+            print(f"check_changed, {state = }")
+            if state == 2:
+                self.data["track_rules"]["inunlimiter"]["state"] = 2
+                self.data["track_rules"]["inunlimiter"]["value"] = 1
+            else:
+                self.data["track_rules"]["inunlimiter"]["state"] = 0
+                self.data["track_rules"]["inunlimiter"]["value"] = 0
+            if self.data["track_rules"][key]["text"] == "Any":
+                self.data["track_rules"][key]["state"] = 0
+                return
+
         self.data["track_rules"][key]["state"] = state
 
-    def create_config(self):
+    def create_config(self) -> dict:
         config = copy.deepcopy(self.data)
         for rule in self.data["track_rules"]:
             if self.data["track_rules"][rule]["state"]:
@@ -353,7 +383,7 @@ class MainWindow(QMainWindow):
         # print(f"{config = }\n{self.data = }")
         return config
 
-    def start(self):
+    def start(self) -> None:
         self.setWindowTitle("Randomizer")
         self.stop_button.setStyleSheet("background-color: red")
         self.start_button.setStyleSheet("background-color: grey")
@@ -370,13 +400,13 @@ class MainWindow(QMainWindow):
         self.tab_widget.setTabEnabled(0, False)
         self.tab_widget.setTabEnabled(1, True)
 
-    def skip(self):
+    def skip(self) -> None:
         self.session.skip()
 
-    def reload(self):
+    def reload(self) -> None:
         self.session.reload()
 
-    def stop(self):
+    def stop(self) -> None:
         self.session.stop()
         self.save_config()
 
@@ -391,7 +421,7 @@ class MainWindow(QMainWindow):
         self.tab_widget.setTabEnabled(0, True)
         self.tab_widget.setTabEnabled(1, False)
 
-    def update_progress(self):
+    def update_progress(self) -> None:
         if self.session.stopped:
             self.progress_timer.stop()
             self.stop()
@@ -419,7 +449,7 @@ class MainWindow(QMainWindow):
         else:
             self.times.setText("          ")
 
-    def game_rule_changed(self, key, value):
+    def game_rule_changed(self, key, value) -> None:
         if key == "time_limit":
             self.data["game_rules"][key] = timedelta(
                 hours=value.hour(), minutes=value.minute(), seconds=value.second()
@@ -431,12 +461,19 @@ class MainWindow(QMainWindow):
         else:
             self.data["game_rules"][key] = value
 
-    def track_rule_changed(self, key, value):
+    def track_rule_changed(self, key, value) -> None:
         track_rule = self.data["track_rules"][key]["value"]
         if key in ["authortimemin", "authortimemax"]:
             track_rule = value.msecsSinceStartOfDay()
         elif key in ["uploadedafter", "uploadedbefore"]:
             track_rule = datetime.fromtimestamp(value.toSecsSinceEpoch())
+        elif key == "unlimiterver":
+            track_rule = sites[self.site.currentText()][f"{key}s"].index(value)
+            self.data["track_rules"]["unlimiterver"]["text"] = value
+            if value == "Any":
+                self.data["track_rules"]["unlimiterver"]["state"] = 0
+            else:
+                self.data["track_rules"]["unlimiterver"]["state"] = 2
         elif key in [
             "tag",
             "primarytype",
@@ -453,7 +490,8 @@ class MainWindow(QMainWindow):
         self.data["track_rules"][key]["value"] = track_rule
         print(f"{key} changed to {track_rule}")
 
-    def save_config(self):
+    def save_config(self) -> None:
+        print(self.data)
         path = os.path.join("binaries", "data.bin")
         with open(path, "wb") as file:
             pickle.dump(self.data, file)
@@ -463,5 +501,4 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
-
     app.exec()

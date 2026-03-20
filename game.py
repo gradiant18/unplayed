@@ -1,8 +1,9 @@
-from datetime import datetime
-from queue import Queue
 import random
 import threading
 import time
+from datetime import datetime
+from queue import Queue
+from track import Track
 from watchdog.observers import Observer
 from watchdog.events import PatternMatchingEventHandler
 from helper import (
@@ -18,7 +19,7 @@ class Handler(PatternMatchingEventHandler):
         super().__init__(patterns=["*.gbx"], ignore_directories=True)
         self.session = session
 
-    def on_modified(self, event):
+    def on_modified(self, event) -> None:
         self.session.update_session(event.src_path)
 
 
@@ -58,7 +59,7 @@ class Game:
         self.stopped = False
         self.stop_reason = None
 
-    def start(self):
+    def start(self) -> None:
         self.start_time = datetime.now()
         if self.time_limit.total_seconds() > 0:
             self.stop_time = self.start_time + self.time_limit
@@ -83,18 +84,18 @@ class Game:
         self.observer.schedule(Handler(self), path=self.autosave_dir, recursive=False)
         self.observer.start()
 
-    def main(self):
+    def main(self) -> None:
         while not self.stop_session:
             if (
                 self.track_limit
                 and len(self.finished) >= 1
                 and len(self.finished) >= self.track_limit
             ):
-                print("\nTrack limit reached")
+                print("Track limit reached")
                 self.stop("Track Limit Reached")
                 break
             if self.stop_time and datetime.now() > self.stop_time:
-                print("\nTime limit reached")
+                print("Time limit reached")
                 self.stop("Time Limit Reached")
                 break
 
@@ -104,7 +105,7 @@ class Game:
                 self.go_next = False
             time.sleep(0.01)
 
-    def stop(self, reason=""):
+    def stop(self, reason="") -> None:
         self.stop_session = True
         if not self.stop_reason:
             self.stop_reason = reason
@@ -116,14 +117,14 @@ class Game:
         save_autosaves(self.data)
         self.stopped = True
 
-    def skip(self):
+    def skip(self) -> None:
         self.go_next = True
 
-    def reload(self):
+    def reload(self) -> None:
         time.sleep(0.5)
         self.current.load(self.config["exe_path"], self.config["debug"])
 
-    def downloader(self):
+    def downloader(self) -> None:
         while len(self.tracks) > 0 and not self.stop_session:
             track = random.choice(self.tracks)
             self.tracks.remove(track)
@@ -134,7 +135,7 @@ class Game:
             track.download(self.track_dir, self.site)
             self.next.put(track)
 
-    def update_session(self, replay_path):
+    def update_session(self, replay_path) -> None:
         replay_uid = get_uid(replay_path)
         if self.current.uid != replay_uid:
             return
@@ -148,18 +149,18 @@ class Game:
                 return
 
         self.autosaves.add(replay_uid)
-        self.finished.add(self.current)
+        self.finished.add(self.current.uid)
         self.data["autosaves"] = self.autosaves
         save_autosaves(self.data)
         if len(self.tracks) >= 0 and not self.stop_session:
             self.go_next = True
 
-    def get_tracks_left(self):
+    def get_tracks_left(self) -> int | None:
         if self.track_limit:
             return self.track_limit - len(self.finished)
         return None
 
-    def get_time_left(self):
+    def get_time_left(self) -> str | None:
         if self.stop_time:
             td = self.stop_time - datetime.now()
             hours, remainder = divmod(td.seconds, 3600)
@@ -168,13 +169,13 @@ class Game:
             return f"{hours:02d}:{minutes:02d}:{int(seconds):02d}"
         return None
 
-    def get_current(self):
+    def get_current(self) -> Track | None:
         try:
             return self.current
         except AttributeError:
             return None
 
-    def __str__(self):
+    def __str__(self) -> str:
         if not self.get_current():
             return ""
 

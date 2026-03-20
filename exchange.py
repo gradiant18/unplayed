@@ -36,6 +36,7 @@ sites = {
         "moods": ["Sunrise", "Day", "Sunset", "Night"],
         "inhasrecords": ["No Records", "Has Records"],
         "difficultys": ["Beginner", "Intermediate", "Expert", "Lunatic"],
+        "unlimitervers": ["Any", "0.4", "0.6", "0.7", "1.1", "1.2", "1.3", "2.0"],
     },
     "TMNF-X": {
         "url": "tmnf.exchange",
@@ -65,6 +66,7 @@ sites = {
         "moods": ["Sunrise", "Day", "Sunset", "Night"],
         "inhasrecords": ["No Records", "Has Records"],
         "difficultys": ["Beginner", "Intermediate", "Expert", "Lunatic"],
+        "unlimitervers": ["Any", "0.4", "0.6", "0.7", "1.1", "1.2", "1.3", "2.0"],
     },
     "TMO-X": {
         "url": "original.tm-exchange.com",
@@ -88,6 +90,7 @@ sites = {
         "moods": ["Sunrise", "Day", "Sunset", "Night"],
         "inhasrecords": ["No Records", "Has Records"],
         "difficultys": ["Beginner", "Intermediate", "Expert", "Lunatic"],
+        "unlimitervers": ["Any", "0.4", "0.6", "0.7", "1.1", "1.2", "1.3", "2.0"],
     },
     "TMS-X": {
         "url": "sunrise.tm-exchange.com",
@@ -111,6 +114,7 @@ sites = {
         "moods": ["Sunrise", "Day", "Sunset", "Night"],
         "inhasrecords": ["No Records", "Has Records"],
         "difficultys": ["Beginner", "Intermediate", "Expert", "Lunatic"],
+        "unlimitervers": ["Any", "0.4", "0.6", "0.7", "1.1", "1.2", "1.3", "2.0"],
     },
     "TMN-X": {
         "url": "nations.tm-exchange.com",
@@ -134,5 +138,6 @@ sites = {
         "moods": ["Sunrise", "Day", "Sunset", "Night"],
         "inhasrecords": ["No Records", "Has Records"],
         "difficultys": ["Beginner", "Intermediate", "Expert", "Lunatic"],
+        "unlimitervers": ["Any", "0.4", "0.6", "0.7", "1.1", "1.2", "1.3", "2.0"],
     },
 }

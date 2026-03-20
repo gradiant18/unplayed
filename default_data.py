@@ -26,23 +26,17 @@ data = {
             "state": 2,
             "value": 82000,
         },
+        "inunlimiter": {
+            "state": 0,
+            "value": 0,
+        },
+        "unlimiterver": {"state": 0, "value": 0, "text": "Any"},
         "tag": {"state": 0, "value": 0, "text": "Race"},
         "primarytype": {"state": 0, "value": 0, "text": "Race"},
         "environment": {"state": 0, "value": 7, "text": "Stadium"},
         "mood": {"state": 0, "value": 1, "text": "Day"},
         "difficulty": {"state": 0, "value": 0, "text": "Beginner"},
         "inhasrecord": {"state": 2, "value": 0, "text": "No Records"},
-        "inunlimiter": {
-            "state": 0,
-            "value": 0,
-        },
-        "unlimiterver": {
-            "state": 0,
-            "value": 0,
-        },
-        "inauthortimebeaten": {
-            "state": 0,
-            "value": 0,
-        },
+        "inauthortimebeaten": {"state": 0, "value": 0, "text": "Not Beaten"},
     },
 }
