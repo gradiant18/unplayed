@@ -31,11 +31,11 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Randomizer")
 
-        path = os.path.join("binaries", "data.bin")
-        if os.path.exists(path):
-            with open(path, "rb") as file:
+        if os.path.exists("data.bin"):
+            with open("data.bin", "rb") as file:
                 self.data = pickle.load(file)
         else:
+            print("Loading default data")
             self.data = data
 
         # Tab 1
@@ -44,7 +44,9 @@ class MainWindow(QMainWindow):
         self.mode_label = QLabel(text="Next Mode")
         self.mode_combo = QComboBox()
         self.mode_combo.addItems(["Author", "Gold", "Silver", "Bronze", "Finished"])
-        self.mode_combo.setCurrentText(self.data["game_rules"]["next_mode"])
+        self.mode_combo.setCurrentText(
+            self.data["game_rules"]["next_mode"].capitalize()
+        )
         self.mode_combo.currentTextChanged.connect(
             lambda val: self.game_rule_changed("next_mode", val.lower())
         )
@@ -491,9 +493,7 @@ class MainWindow(QMainWindow):
         print(f"{key} changed to {track_rule}")
 
     def save_config(self) -> None:
-        print(self.data)
-        path = os.path.join("binaries", "data.bin")
-        with open(path, "wb") as file:
+        with open("data.bin", "wb") as file:
             pickle.dump(self.data, file)
 
 

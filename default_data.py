@@ -6,7 +6,7 @@ data = {
     "game_rules": {
         "next_mode": "finished",
         "track_limit": 0,
-        "time_limit": datetime.timedelta(minutes=10),
+        "time_limit": datetime.timedelta(minutes=15),
         "site": "TMNF-X",
     },
     "track_rules": {
@@ -24,7 +24,7 @@ data = {
         },
         "authortimemax": {
             "state": 2,
-            "value": 82000,
+            "value": 105000,
         },
         "inunlimiter": {
             "state": 0,

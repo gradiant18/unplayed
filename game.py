@@ -138,9 +138,10 @@ class Game:
     def update_session(self, replay_path) -> None:
         replay_uid = get_uid(replay_path)
         if self.current.uid != replay_uid:
+            # different track played
             return
-        if self.current in self.autosaves:
-            print(f"might be uid clash: {self.current.uid}")
+        if self.current.uid in self.autosaves:
+            # already played (duplicate watchdog event)
             return
 
         replay_time = self.current.update_medal(replay_path)
@@ -150,6 +151,7 @@ class Game:
 
         self.autosaves.add(replay_uid)
         self.finished.add(self.current.uid)
+        print(self.finished)
         self.data["autosaves"] = self.autosaves
         save_autosaves(self.data)
         if len(self.tracks) >= 0 and not self.stop_session:
