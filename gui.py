@@ -30,6 +30,7 @@ class MainWindow(QMainWindow):
         self.data = data
         options_tab = self.make_options_tab()
         game_tab = self.make_game_tab()
+        settings_tab = self.make_settings_tab()
         self.tab_widget = QTabWidget()
         self.tab_widget.addTab(options_tab, "Options")
         self.tab_widget.addTab(game_tab, "Game")
@@ -296,6 +297,13 @@ class MainWindow(QMainWindow):
         tab.setLayout(layout)
         return tab
 
+    def make_settings_tab(self) -> QWidget:
+        # force window size true/false
+        # exe path
+        # track dir
+        tab = QWidget()
+        return tab
+
     def make_checkbox(self, text, label) -> QCheckBox:
         checkbox = QCheckBox(text)
         checkbox.setChecked(self.data["track_rules"][label]["state"])
@@ -306,7 +314,6 @@ class MainWindow(QMainWindow):
         return checkbox
 
     def make_combobox(self, label, site="all") -> QComboBox:
-        print(label, site)
         combo = QComboBox()
         site_items = sites[site].get(label)
         if not site_items:
@@ -327,9 +334,9 @@ class MainWindow(QMainWindow):
         )
         return combo
 
-    def update_combobox(self, label) -> None:
+    def update_combobox(self, label, site="all") -> None:
         combo = getattr(self, label, None)
-        site_items = sites[self.site.currentText()].get(f"{label}s")
+        site_items = sites[site].get(label)
         if combo is None or not site_items:
             return
         combo.currentTextChanged.disconnect()
@@ -348,7 +355,7 @@ class MainWindow(QMainWindow):
             self.data["track_rules"][label]["value"] = site_items.index(items[0])
             self.data["track_rules"][label]["text"] = items[0]
         combo.currentTextChanged.connect(
-            lambda val: self.track_rule_changed(label, val)
+            lambda val: self.track_rule_changed(label, val, site)
         )
 
     def check_changed(self, key, state) -> None:
@@ -454,7 +461,7 @@ class MainWindow(QMainWindow):
         elif key == "site":
             self.data["game_rules"][key] = value
             for param in ["tag", "primarytype", "environment"]:
-                self.update_combobox(param)
+                self.update_combobox(param, self.site.currentText())
         else:
             self.data["game_rules"][key] = value
 
