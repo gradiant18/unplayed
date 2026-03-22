@@ -1,15 +1,12 @@
 import copy
-import os
 import pickle
 import sys
 import time
 from datetime import datetime, timedelta
-from default_data import data
 from exchange import sites
 from game import Game
 from PyQt6.QtCore import QDateTime, QTime, QTimer
 from PyQt6.QtWidgets import (
-    QApplication,
     QCheckBox,
     QDateTimeEdit,
     QHBoxLayout,
@@ -27,19 +24,25 @@ from PyQt6.QtWidgets import (
 
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, data):
         super().__init__()
         self.setWindowTitle("Randomizer")
+        self.data = data
+        options_tab = self.make_options_tab()
+        game_tab = self.make_game_tab()
+        self.tab_widget = QTabWidget()
+        self.tab_widget.addTab(options_tab, "Options")
+        self.tab_widget.addTab(game_tab, "Game")
+        self.tab_widget.setTabEnabled(1, False)
 
-        if os.path.exists("data.bin"):
-            with open("data.bin", "rb") as file:
-                self.data = pickle.load(file)
-        else:
-            print("Loading default data")
-            self.data = data
+        self.setCentralWidget(self.tab_widget)
+        self.setMinimumSize(self.minimumSizeHint())
+        self.setMaximumSize(self.minimumSizeHint())
 
-        # Tab 1
+        self.progress_timer = QTimer(self)
+        self.progress_timer.timeout.connect(self.update_progress)
 
+    def make_options_tab(self) -> QWidget:
         # next_mode
         self.mode_label = QLabel(text="Next Mode")
         self.mode_combo = QComboBox()
@@ -145,7 +148,7 @@ class MainWindow(QMainWindow):
         at_max.addWidget(self.authortimemax)
 
         # tag
-        self.tag = self.make_combobox("tag")
+        self.tag = self.make_combobox("tag", self.site.currentText())
         self.tag_check = self.make_checkbox("Tag", "tag")
         tag = QVBoxLayout()
         tag.addWidget(self.tag_check)
@@ -159,7 +162,7 @@ class MainWindow(QMainWindow):
         primarytype.addWidget(self.primarytype)
 
         # environment
-        self.environment = self.make_combobox("environment")
+        self.environment = self.make_combobox("environment", self.site.currentText())
         self.environment_check = self.make_checkbox("Environment", "environment")
         environment = QVBoxLayout()
         environment.addWidget(self.environment_check)
@@ -236,17 +239,19 @@ class MainWindow(QMainWindow):
         main5.addLayout(inhasrecord)
         main5.addLayout(unlimiter)
 
-        tab = QVBoxLayout()
-        tab.addLayout(main)
-        tab.addLayout(main2)
-        tab.addLayout(main3)
-        tab.addLayout(main4)
-        tab.addLayout(main5)
-        tab.addWidget(self.start_button)
-        tab.addWidget(self.save_button)
-        tab1 = QWidget()
-        tab1.setLayout(tab)
+        layout = QVBoxLayout()
+        layout.addLayout(main)
+        layout.addLayout(main2)
+        layout.addLayout(main3)
+        layout.addLayout(main4)
+        layout.addLayout(main5)
+        layout.addWidget(self.start_button)
+        layout.addWidget(self.save_button)
+        tab = QWidget()
+        tab.setLayout(layout)
+        return tab
 
+    def make_game_tab(self) -> QWidget:
         # Tab 2
         self.tracks = QLabel()
         self.track_progress = QProgressBar()
@@ -284,23 +289,12 @@ class MainWindow(QMainWindow):
         buttons.addWidget(self.skip_button)
         buttons.addWidget(self.stop_button)
 
-        tab = QVBoxLayout()
-        tab.addLayout(bars)
-        tab.addLayout(buttons)
-        tab2 = QWidget()
-        tab2.setLayout(tab)
-
-        self.tab_widget = QTabWidget()
-        self.tab_widget.addTab(tab1, "Config")
-        self.tab_widget.addTab(tab2, "Game")
-        self.tab_widget.setTabEnabled(1, False)
-
-        self.setCentralWidget(self.tab_widget)
-        self.setMinimumSize(self.minimumSizeHint())
-        self.setMaximumSize(self.minimumSizeHint())
-
-        self.progress_timer = QTimer(self)
-        self.progress_timer.timeout.connect(self.update_progress)
+        layout = QVBoxLayout()
+        layout.addLayout(bars)
+        layout.addLayout(buttons)
+        tab = QWidget()
+        tab.setLayout(layout)
+        return tab
 
     def make_checkbox(self, text, label) -> QCheckBox:
         checkbox = QCheckBox(text)
@@ -311,9 +305,10 @@ class MainWindow(QMainWindow):
             param.setEnabled(checkbox.isChecked())
         return checkbox
 
-    def make_combobox(self, label) -> QComboBox:
+    def make_combobox(self, label, site="all") -> QComboBox:
+        print(label, site)
         combo = QComboBox()
-        site_items = sites[self.site.currentText()].get(f"{label}s")
+        site_items = sites[site].get(label)
         if not site_items:
             return combo
         items = [item for item in site_items if item != ""]
@@ -328,7 +323,7 @@ class MainWindow(QMainWindow):
             self.data["track_rules"][label]["value"] = site_items.index(items[0])
             self.data["track_rules"][label]["text"] = items[0]
         combo.currentTextChanged.connect(
-            lambda val: self.track_rule_changed(label, val)
+            lambda val: self.track_rule_changed(label, val, site)
         )
         return combo
 
@@ -463,31 +458,29 @@ class MainWindow(QMainWindow):
         else:
             self.data["game_rules"][key] = value
 
-    def track_rule_changed(self, key, value) -> None:
+    def track_rule_changed(self, key, value, site="all") -> None:
         track_rule = self.data["track_rules"][key]["value"]
         if key in ["authortimemin", "authortimemax"]:
             track_rule = value.msecsSinceStartOfDay()
         elif key in ["uploadedafter", "uploadedbefore"]:
             track_rule = datetime.fromtimestamp(value.toSecsSinceEpoch())
         elif key == "unlimiterver":
-            track_rule = sites[self.site.currentText()][f"{key}s"].index(value)
+            track_rule = sites[site][key].index(value)
             self.data["track_rules"]["unlimiterver"]["text"] = value
             if value == "Any":
                 self.data["track_rules"]["unlimiterver"]["state"] = 0
             else:
                 self.data["track_rules"]["unlimiterver"]["state"] = 2
         elif key in [
-            "tag",
-            "primarytype",
-            "environment",
-            "mood",
             "difficulty",
+            "environment",
             "inhasrecord",
+            "mood",
+            "primarytype",
+            "tag",
         ]:
-            track_rule = sites[self.site.currentText()][f"{key}s"].index(value)
-            self.data["track_rules"][key]["text"] = sites[self.site.currentText()][
-                f"{key}s"
-            ][track_rule]
+            track_rule = sites[site][key].index(value)
+            self.data["track_rules"][key]["text"] = sites[site][key][track_rule]
 
         self.data["track_rules"][key]["value"] = track_rule
         print(f"{key} changed to {track_rule}")
@@ -495,10 +488,3 @@ class MainWindow(QMainWindow):
     def save_config(self) -> None:
         with open("data.bin", "wb") as file:
             pickle.dump(self.data, file)
-
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = MainWindow()
-    window.show()
-    app.exec()

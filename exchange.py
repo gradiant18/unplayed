@@ -1,7 +1,14 @@
 sites = {
+    "all": {
+        "difficulty": ["Beginner", "Intermediate", "Expert", "Lunatic"],
+        "inhasrecord": ["No Records", "Has Records"],
+        "mood": ["Sunrise", "Day", "Sunset", "Night"],
+        "primarytype": ["Race", "Puzzle", "Platform", "Stunts", "Shortcut", "Laps"],
+        "unlimiterver": ["Any", "0.4", "0.6", "0.7", "1.1", "1.2", "1.3", "2.0"],
+    },
     "TMUF-X": {
         "url": "tmuf.exchange",
-        "tags": [
+        "tag": [
             "Race",
             "Stunt",
             "Maze",
@@ -22,8 +29,7 @@ sites = {
             "Altered Nadeo",
             "Transitional",
         ],
-        "primarytypes": ["Race", "Puzzle", "Platform", "Stunts", "Shortcut", "Laps"],
-        "environments": [
+        "environment": [
             "",
             "Snow",
             "Desert",
@@ -33,14 +39,10 @@ sites = {
             "Bay",
             "Stadium",
         ],
-        "moods": ["Sunrise", "Day", "Sunset", "Night"],
-        "inhasrecords": ["No Records", "Has Records"],
-        "difficultys": ["Beginner", "Intermediate", "Expert", "Lunatic"],
-        "unlimitervers": ["Any", "0.4", "0.6", "0.7", "1.1", "1.2", "1.3", "2.0"],
     },
     "TMNF-X": {
         "url": "tmnf.exchange",
-        "tags": [
+        "tag": [
             "Race",
             "Stunt",
             "Maze",
@@ -61,16 +63,11 @@ sites = {
             "Altered Nadeo",
             "Transitional",
         ],
-        "primarytypes": ["Race", "Puzzle", "Platform", "Stunts", "Shortcut", "Laps"],
-        "environments": ["", "", "", "", "", "", "", "Stadium"],
-        "moods": ["Sunrise", "Day", "Sunset", "Night"],
-        "inhasrecords": ["No Records", "Has Records"],
-        "difficultys": ["Beginner", "Intermediate", "Expert", "Lunatic"],
-        "unlimitervers": ["Any", "0.4", "0.6", "0.7", "1.1", "1.2", "1.3", "2.0"],
+        "environment": ["", "", "", "", "", "", "", "Stadium"],
     },
     "TMO-X": {
         "url": "original.tm-exchange.com",
-        "tags": [
+        "tag": [
             "Race",
             "Stunt",
             "Maze",
@@ -85,16 +82,11 @@ sites = {
             "Trial",
             "Grass",
         ],
-        "primarytypes": ["Race", "Puzzle", "Platform", "Stunts", "Shortcut", "Laps"],
-        "environments": ["", "Snow", "Desert", "Rally"],
-        "moods": ["Sunrise", "Day", "Sunset", "Night"],
-        "inhasrecords": ["No Records", "Has Records"],
-        "difficultys": ["Beginner", "Intermediate", "Expert", "Lunatic"],
-        "unlimitervers": ["Any", "0.4", "0.6", "0.7", "1.1", "1.2", "1.3", "2.0"],
+        "environment": ["", "Snow", "Desert", "Rally"],
     },
     "TMS-X": {
         "url": "sunrise.tm-exchange.com",
-        "tags": [
+        "tag": [
             "Race",
             "Stunt",
             "Maze",
@@ -109,16 +101,11 @@ sites = {
             "Trial",
             "Grass",
         ],
-        "primarytypes": ["Race", "Puzzle", "Platform", "Stunts", "Shortcut", "Laps"],
-        "environments": ["", "", "", "", "Island", "Coast", "Bay"],
-        "moods": ["Sunrise", "Day", "Sunset", "Night"],
-        "inhasrecords": ["No Records", "Has Records"],
-        "difficultys": ["Beginner", "Intermediate", "Expert", "Lunatic"],
-        "unlimitervers": ["Any", "0.4", "0.6", "0.7", "1.1", "1.2", "1.3", "2.0"],
+        "environment": ["", "", "", "", "Island", "Coast", "Bay"],
     },
     "TMN-X": {
         "url": "nations.tm-exchange.com",
-        "tags": [
+        "tag": [
             "Race",
             "Stunt",
             "Maze",
@@ -133,11 +120,6 @@ sites = {
             "Trial",
             "Grass",
         ],
-        "primarytypes": ["Race", "Puzzle", "Platform", "Stunts", "Shortcut", "Laps"],
-        "environments": ["", "", "", "", "", "", "", "Stadium"],
-        "moods": ["Sunrise", "Day", "Sunset", "Night"],
-        "inhasrecords": ["No Records", "Has Records"],
-        "difficultys": ["Beginner", "Intermediate", "Expert", "Lunatic"],
-        "unlimitervers": ["Any", "0.4", "0.6", "0.7", "1.1", "1.2", "1.3", "2.0"],
+        "environment": ["", "", "", "", "", "", "", "Stadium"],
     },
 }
