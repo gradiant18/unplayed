@@ -3,6 +3,7 @@ sessions/*
 venv/*
 gui/*
 *.yaml
+*.yml
 *.bin
 *.log
 update_banned_tracks.py

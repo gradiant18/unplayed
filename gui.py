@@ -28,7 +28,7 @@ from update_banned_tracks import get_cheated_ids
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, data):
+    def __init__(self, data) -> None:
         super().__init__()
         self.setWindowTitle("Randomizer")
         self.data = data
@@ -310,7 +310,7 @@ class MainWindow(QMainWindow):
         tab = QWidget()
         return tab
 
-    def banned_tracks_changed(self):
+    def banned_tracks_changed(self) -> None:
         for site in self.site_tabs:
             text = self.site_tabs[site].toPlainText()
             if not (matches := re.findall(r"\d+", text)):
@@ -391,7 +391,7 @@ class MainWindow(QMainWindow):
 
         return ids
 
-    def load_banned_tracks(self):
+    def load_banned_tracks(self) -> None:
         # replace banned tracks from file
         file_dialog = QFileDialog(self)
         file_dialog.setWindowTitle("Open File")
