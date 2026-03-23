@@ -39,4 +39,11 @@ default_data = {
         "inhasrecord": {"state": 2, "value": 0, "text": "No Records"},
         "inauthortimebeaten": {"state": 0, "value": 0, "text": "Not Beaten"},
     },
+    "banned_tracks": {
+        "TMUF-X": set(),
+        "TMNF-X": set(),
+        "TMO-X": set(),
+        "TMS-X": set(),
+        "TMN-X": set(),
+    },
 }
