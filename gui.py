@@ -314,8 +314,9 @@ class MainWindow(QMainWindow):
         for site in self.site_tabs:
             text = self.site_tabs[site].toPlainText()
             if not (matches := re.findall(r"\d+", text)):
-                return
-            ids = {int(x) for x in matches}
+                ids = {}
+            else:
+                ids = {int(x) for x in matches}
             self.data["banned_tracks"][site] = ids
 
     def make_site_tabs(self) -> QTabWidget:
@@ -339,14 +340,14 @@ class MainWindow(QMainWindow):
         self.text_input = self.make_site_tabs()
 
         save = QPushButton("Save")
-        save.clicked.connect(self.save_banned_tracks)
+        save.clicked.connect(self.save_config)
         load = QPushButton("Load")
         load.clicked.connect(self.load_banned_tracks)
         export = QPushButton("Export")
         export.clicked.connect(self.export_banned_tracks)
         clear = QPushButton("Clear")
         clear.clicked.connect(self.clear_banned_tracks)
-        update = QPushButton("Update ")
+        update = QPushButton("Update")
         update.clicked.connect(self.update_banned_tracks)
 
         buttons = QVBoxLayout()
@@ -360,52 +361,38 @@ class MainWindow(QMainWindow):
         tab.setLayout(layout)
         return tab
 
-    # TODO: fix
-    def get_ids_from_file(self, file_path) -> list:
-        ids = []
-        ends = []
-        with open(file_path) as file:
+    def get_ids_from_file(self, file_path) -> dict:
+        with open(file_path, "r", encoding="utf-8") as file:
             data = file.read()
-        if tmuf := re.search("TMUF-X", data):
-            ends.append(["TMUF-X", tmuf.start(), tmuf.end()])
-        if tmnf := re.search("TMNF-X", data):
-            ends.append(["TMNF-X", tmnf.start(), tmnf.end()])
-        if tmo := re.search("TMO-X", data):
-            ends.append(["TMO-X", tmo.start(), tmo.end()])
-        if tms := re.search("TMS-X", data):
-            ends.append(["TMS-X", tms.start(), tms.end()])
-        if tmn := re.search("TMN-X", data):
-            ends.append(["TMN-X", tmn.start(), tmn.end()])
-        ends.sort(key=lambda site: site[1])
-        print(ends)
 
-        if len(ends) == 0:
-            return []
+        pattern = re.compile(r"\b(TMUF|TMNF|TMO|TMS|TMN)(?:-X)?\b", re.IGNORECASE)
+        matches = list(pattern.finditer(data))
+        if not matches:
+            return {}
 
-        if len(ends) == 1:
-            search = data[ends[0][2] :]
-            pass
+        ids = {}
 
-        for i in range(len(ends) - 1):
-            pass
+        for i, current_match in enumerate(matches):
+            base_site = current_match.group(1).upper()
+            site_key = f"{base_site}-X"
+
+            start_idx = current_match.end()
+
+            if i + 1 < len(matches):
+                end_idx = matches[i + 1].start()
+            else:
+                end_idx = len(data)
+
+            section_text = data[start_idx:end_idx]
+            found_ids = {int(x) for x in re.findall(r"\d+", section_text)}
+            if site_key not in ids:
+                ids[site_key] = set()
+            ids[site_key].update(found_ids)
 
         return ids
 
-    def save_banned_tracks(self):
-        # save banned tracks to file
-        file_dialog = QFileDialog(self)
-        file_dialog.setWindowTitle("Save File")
-        if file_dialog.exec():
-            path = file_dialog.selectedFiles()[0]
-            with open(path, "w") as file:
-                file.write(self.get_banned_tracks())
-
-    # TODO: implement
     def load_banned_tracks(self):
         # replace banned tracks from file
-        ids = self.get_ids_from_file("tracks.txt")
-        print(ids)
-        return
         file_dialog = QFileDialog(self)
         file_dialog.setWindowTitle("Open File")
         file_dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
@@ -414,16 +401,29 @@ class MainWindow(QMainWindow):
         if file_dialog.exec():
             path = file_dialog.selectedFiles()[0]
             ids = self.get_ids_from_file(path)
-            print(ids)
+            self.data["banned_tracks"].update(ids)
+            for site in self.site_tabs:
+                text = ""
+                if not ids.get(site):
+                    self.site_tabs[site].setText("")
+                    continue
+                for id in ids[site]:
+                    text += f"{id}\n"
+                self.site_tabs[site].setText(text)
 
     def export_banned_tracks(self) -> None:
         # save banned tracks to file
         file_dialog = QFileDialog(self)
         file_dialog.setWindowTitle("Export File")
         if file_dialog.exec():
-            path = file_dialog.selectedFiles()[0]
-            with open(path, "w") as file:
-                file.write(self.get_banned_tracks())
+            ids = ""
+            for site in self.data["banned_tracks"]:
+                site_ids = f"{site}:"
+                for track_id in self.data["banned_tracks"].get(site):
+                    site_ids += f"\n - {track_id}"
+                ids += f"{site_ids}\n"
+            with open(file_dialog.selectedFiles()[0], "w") as file:
+                file.write(ids)
 
     def clear_banned_tracks(self) -> None:
         # empty banned tracks
@@ -444,16 +444,9 @@ class MainWindow(QMainWindow):
             site_ids = ""
             for track_id in self.data["banned_tracks"].get(site):
                 site_ids += f"{track_id}\n"
+            self.site_tabs[site].textChanged.disconnect()
             self.site_tabs[site].setText(site_ids)
-
-    def get_banned_tracks(self) -> str:
-        ids = ""
-        for site in self.data["banned_tracks"]:
-            site_ids = f"{site}:"
-            for track_id in self.data["banned_tracks"].get(site):
-                site_ids += f"\n - {track_id}"
-            ids += f"{site_ids}\n"
-        return ids
+            self.site_tabs[site].textChanged.connect(self.banned_tracks_changed)
 
     def make_checkbox(self, text, label) -> QCheckBox:
         checkbox = QCheckBox(text)

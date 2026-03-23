@@ -40,10 +40,10 @@ default_data = {
         "inauthortimebeaten": {"state": 0, "value": 0, "text": "Not Beaten"},
     },
     "banned_tracks": {
-        "TMUF-X": [],
-        "TMNF-X": [],
-        "TMO-X": [],
-        "TMS-X": [],
-        "TMN-X": [],
+        "TMUF-X": set(),
+        "TMNF-X": set(),
+        "TMO-X": set(),
+        "TMS-X": set(),
+        "TMN-X": set(),
     },
 }
