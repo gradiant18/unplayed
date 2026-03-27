@@ -4,6 +4,7 @@ import requests
 import time
 import re
 from concurrent.futures import ThreadPoolExecutor
+from exchange import values
 import pickle
 
 
@@ -60,21 +61,10 @@ def get_autosaves(session):
     return data
 
 
-def get_session_url(session):
-    sites = {
-        "TMUF-X": "tmuf.exchange",
-        "TMNF-X": "tmnf.exchange",
-        "TMO-X": "original.tm-exchange.com",
-        "TMS-X": "sunrise.tm-exchange.com",
-        "TMN-X": "nations.tm-exchange.com",
-    }
-    return sites[session.site]
-
-
 def get_tracks(session):
-    api_url = f"https://{get_session_url(session)}/api/tracks?"
+    api_url = f"https://{values[session.site]['url']}/api/tracks?"
     params = {
-        "fields": "TrackId,TrackName,UId,AuthorTime,GoldTarget,SilverTarget,BronzeTarget",
+        "fields": "TrackId,TrackName,UId,AuthorTime,GoldTarget,SilverTarget,BronzeTarget,WRReplay.ReplayTime",
         "count": 1000,
     }
 
@@ -87,7 +77,8 @@ def get_tracks(session):
     current_last = 0
 
     with requests.Session() as http:
-        while not session.stop_session:
+        retries = 0
+        while not session.stop_session and retries < 5:
             try:
                 params["after"] = current_last
                 response = http.get(api_url, params=params, timeout=10)
@@ -117,6 +108,7 @@ def get_tracks(session):
 
             except requests.exceptions.RequestException as e:
                 print(f"API Error fetching tracks: {e}")
+                retries += 1
                 time.sleep(1)
                 continue
 

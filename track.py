@@ -1,6 +1,7 @@
 import os
 import platform
 from pygbx import Gbx, GbxType
+from exchange import values
 import requests
 import subprocess
 import time
@@ -19,6 +20,9 @@ class Track:
             "bronze": track["BronzeTarget"],
         }
         self.medal = None
+
+        if track.get("WRReplay"):
+            self.medals["wr"] = track["WRReplay"]["ReplayTime"]
 
     def update_medal(self, replay_path):
         if not (ghost := Gbx(replay_path).get_class_by_id(GbxType.CTN_GHOST)):
@@ -54,7 +58,7 @@ class Track:
 
     def download(self, track_dir, site):
         # check dir path
-        dir_path = os.path.join(track_dir, "Challenges/Randomizer", site)
+        dir_path = os.path.join(track_dir, "Challenges", "Randomizer", site)
         if not os.path.exists(dir_path):
             os.mkdir(dir_path)
 
@@ -64,14 +68,7 @@ class Track:
             return
 
         # get download url
-        sites = {
-            "TMUF-X": "tmuf.exchange",
-            "TMNF-X": "tmnf.exchange",
-            "TMO-X": "original.tm-exchange.com",
-            "TMS-X": "sunrise.tm-exchange.com",
-            "TMN-X": "nations.tm-exchange.com",
-        }
-        download_url = f"https://{sites[site]}/trackgbx/{self.track_id}"
+        download_url = f"https://{values[site]['url']}/trackgbx/{self.track_id}"
 
         retries = 0
         while retries < 3:

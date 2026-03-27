@@ -2,9 +2,11 @@ import copy
 import pickle
 import sys
 import time
+
+from requests import session
 from banned_tracks import BannedTracksTab
 from datetime import datetime, timedelta
-from exchange import sites
+from exchange import values
 from game import Game
 from settings import SettingsTab
 from PyQt6.QtCore import QDateTime, QTime, QTimer
@@ -54,7 +56,7 @@ class MainWindow(QMainWindow):
         # next_mode
         self.mode_label = QLabel(text="Next Mode")
         self.mode_combo = QComboBox()
-        self.mode_combo.addItems(["Author", "Gold", "Silver", "Bronze", "Finished"])
+        self.mode_combo.addItems(values["all"]["mode"])
         self.mode_combo.setCurrentText(
             self.data["game_rules"]["next_mode"].capitalize()
         )
@@ -94,7 +96,7 @@ class MainWindow(QMainWindow):
         # site
         self.site_label = QLabel(text="Site")
         self.site = QComboBox()
-        self.site.addItems(["TMUF-X", "TMNF-X", "TMO-X", "TMN-X", "TMS-X"])
+        self.site.addItems(values["all"]["site"])
         self.site.setCurrentText(self.data["game_rules"]["site"])
         self.site.currentTextChanged.connect(
             lambda val: self.game_rule_changed("site", val)
@@ -319,7 +321,7 @@ class MainWindow(QMainWindow):
 
     def make_combobox(self, label, site="all") -> QComboBox:
         combo = QComboBox()
-        site_items = sites[site].get(label)
+        site_items = values[site].get(label)
         if not site_items:
             return combo
         items = [item for item in site_items if item != ""]
@@ -340,7 +342,7 @@ class MainWindow(QMainWindow):
 
     def update_combobox(self, label, site="all") -> None:
         combo = getattr(self, label, None)
-        site_items = sites[site].get(label)
+        site_items = values[site].get(label)
         if combo is None or not site_items:
             return
         combo.currentTextChanged.disconnect()
@@ -457,6 +459,17 @@ class MainWindow(QMainWindow):
         else:
             self.times.setText("          ")
 
+        try:
+            track = self.session.current.track_id
+            target = self.session.current.medals.get(self.session.mode)
+            if not target:
+                self.setWindowTitle(f"Randomizer | {track}")
+            else:
+                self.setWindowTitle(f"Randomizer | {track} | {target}")
+        except AttributeError:
+            # current wasn't initialized yet
+            pass
+
     def game_rule_changed(self, key, value) -> None:
         if key == "time_limit":
             self.data["game_rules"][key] = timedelta(
@@ -476,7 +489,7 @@ class MainWindow(QMainWindow):
         elif key in ["uploadedafter", "uploadedbefore"]:
             track_rule = datetime.fromtimestamp(value.toSecsSinceEpoch())
         elif key == "unlimiterver":
-            track_rule = sites[site][key].index(value)
+            track_rule = values[site][key].index(value)
             self.data["track_rules"]["unlimiterver"]["text"] = value
             if value == "Any":
                 self.data["track_rules"]["unlimiterver"]["state"] = 0
@@ -490,8 +503,8 @@ class MainWindow(QMainWindow):
             "primarytype",
             "tag",
         ]:
-            track_rule = sites[site][key].index(value)
-            self.data["track_rules"][key]["text"] = sites[site][key][track_rule]
+            track_rule = values[site][key].index(value)
+            self.data["track_rules"][key]["text"] = values[site][key][track_rule]
 
         self.data["track_rules"][key]["value"] = track_rule
         print(f"{key} changed to {track_rule}")

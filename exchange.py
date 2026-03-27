@@ -1,5 +1,7 @@
-sites = {
+values = {
     "all": {
+        "mode": ["Author", "Gold", "Silver", "Bronze", "Finished", "WR"],
+        "site": ["TMUF-X", "TMNF-X", "TMO-X", "TMN-X", "TMS-X"],
         "difficulty": ["Beginner", "Intermediate", "Expert", "Lunatic"],
         "inhasrecord": ["No Records", "Has Records"],
         "mood": ["Sunrise", "Day", "Sunset", "Night"],

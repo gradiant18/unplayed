@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
 )
 import pickle
-from exchange import sites
+from exchange import values
 import csv
 import re
 import requests
@@ -53,7 +53,7 @@ class BannedTracksTab(QWidget):
 
     def make_site_tabs(self) -> QTabWidget:
         tab = QTabWidget()
-        for site in sites:
+        for site in values:
             if site == "all":
                 continue
 

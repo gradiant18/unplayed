@@ -141,12 +141,15 @@ class Game:
             # different track played
             return
         if self.current.uid in self.autosaves:
-            # already played (duplicate watchdog event)
+            # already played (duplicate watchdog event probably)
             return
 
         replay_time = self.current.update_medal(replay_path)
         if self.mode != "finished":
-            if replay_time > self.current.medals[self.mode]:
+            if (
+                self.current.medals[self.mode]
+                and replay_time > self.current.medals[self.mode]
+            ):
                 return
 
         self.autosaves.add(replay_uid)
