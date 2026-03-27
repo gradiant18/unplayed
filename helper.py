@@ -76,6 +76,7 @@ def get_tracks(session):
     autosaves_set = session.autosaves
     current_last = 0
 
+    processed_uids = {"uids": [], "ids": []}
     with requests.Session() as http:
         retries = 0
         while not session.stop_session and retries < 5:
@@ -101,6 +102,8 @@ def get_tracks(session):
                 if valid_tracks:
                     session.tracks.extend(valid_tracks)
 
+                processed_uids = detect_uid_clash(processed_uids, valid_tracks)
+
                 current_last = results[-1]["TrackId"]
 
                 if not data.get("More", False):
@@ -116,3 +119,22 @@ def get_tracks(session):
     original_limit = session.config["game_rules"].get("track_limit")
     if session.track_limit != original_limit:
         session.track_limit = len(session.tracks)
+
+
+def detect_uid_clash(processed_uids, tracks):
+    for track in tracks:
+        if track.wr:
+            # has replay, so don't care if uid clash
+            processed_uids["uids"].append(track.uid)
+            processed_uids["ids"].append(track.track_id)
+            continue
+
+        if track.uid in processed_uids["uids"]:
+            # no replay, do care if uid clash
+            index = processed_uids["uids"].index(track.uid)
+            print(f"UID clash for {track.track_id} and {processed_uids['ids'][index]}")
+        else:
+            # no replay, no uid clash
+            processed_uids["uids"].append(track.uid)
+            processed_uids["ids"].append(track.track_id)
+    return processed_uids

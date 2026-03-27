@@ -146,11 +146,12 @@ class Game:
 
         replay_time = self.current.update_medal(replay_path)
         if self.mode != "finished":
-            if (
-                self.current.medals[self.mode]
-                and replay_time > self.current.medals[self.mode]
-            ):
-                return
+            if self.mode == "wr":
+                if self.current.wr and replay_time > self.current.wr:
+                    return
+            else:
+                if replay_time > self.current.medals[self.mode]:
+                    return
 
         self.autosaves.add(replay_uid)
         self.finished.add(self.current.uid)

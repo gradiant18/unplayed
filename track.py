@@ -20,9 +20,10 @@ class Track:
             "bronze": track["BronzeTarget"],
         }
         self.medal = None
-
+        self.wr = None
         if track.get("WRReplay"):
-            self.medals["wr"] = track["WRReplay"]["ReplayTime"]
+            if track["WRReplay"].get("ReplayTime"):
+                self.wr = track["WRReplay"]["ReplayTime"]
 
     def update_medal(self, replay_path):
         if not (ghost := Gbx(replay_path).get_class_by_id(GbxType.CTN_GHOST)):
