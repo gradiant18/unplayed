@@ -1,6 +1,6 @@
 import os
 import platform
-from pygbx import Gbx, GbxType
+import re
 from exchange import values
 import requests
 import subprocess
@@ -25,16 +25,22 @@ class Track:
             if track["WRReplay"].get("ReplayTime"):
                 self.wr = track["WRReplay"]["ReplayTime"]
 
-    def update_medal(self, replay_path):
-        if not (ghost := Gbx(replay_path).get_class_by_id(GbxType.CTN_GHOST)):
+    def update_medal(self, replay_path) -> int | None:
+        with open(replay_path, "rb") as file:
+            data = file.read(4096)
+        if not data:
             return None
+        match = re.search(rb'times best="(\d*)"', data)
+        if not match:
+            return None
+        replay_time = int(match.group(1).decode("utf-8"))
 
         medal = "None"
         for medal in self.medals:
-            if ghost.race_time <= self.medals[medal]:
+            if replay_time <= self.medals[medal]:
                 self.medal = medal
                 break
-        return ghost.race_time
+        return replay_time
 
     # TODO: make not os/program dependent
     def load(self, exe_path, debug):
