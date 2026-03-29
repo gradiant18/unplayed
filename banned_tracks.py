@@ -1,5 +1,6 @@
 from PyQt6.QtWidgets import (
     QFileDialog,
+    QMessageBox,
     QTextEdit,
     QWidget,
     QTabWidget,
@@ -69,7 +70,7 @@ class BannedTracksTab(QWidget):
         return tab
 
     def get_ids_from_file(self, file_path) -> dict:
-        with open(file_path, "r", encoding="utf-8") as file:
+        with open(file_path, "r") as file:
             data = file.read()
 
         pattern = re.compile(r"\b(TMUF|TMNF|TMO|TMS|TMN)(?:-X)?\b", re.IGNORECASE)
@@ -135,15 +136,22 @@ class BannedTracksTab(QWidget):
 
     def clear_banned_tracks(self) -> None:
         # empty banned tracks
-        self.data["banned_tracks"] = {
-            "TMUF-X": [],
-            "TMNF-X": [],
-            "TMO-X": [],
-            "TMS-X": [],
-            "TMN-X": [],
-        }
-        for site in self.site_tabs:
-            self.site_tabs[site].setText("")
+        reply = QMessageBox.question(
+            self,
+            "Clear Banned Tracks",
+            "Are you sure you want to clear all banned tracks?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            self.data["banned_tracks"] = {
+                "TMUF-X": [],
+                "TMNF-X": [],
+                "TMO-X": [],
+                "TMS-X": [],
+                "TMN-X": [],
+            }
+            for site in self.site_tabs:
+                self.site_tabs[site].setText("")
 
     def update_banned_tracks(self) -> None:
         # update banned tracks from cheated track spread sheet
