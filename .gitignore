@@ -1,10 +1,10 @@
 __pycache__/*
-sessions/*
 venv/*
-gui/*
+build/*
+dist/*
 *.yaml
 *.yml
 *.bin
 *.log
-update_banned_tracks.py
-test.py
+*.bin
+*.spec

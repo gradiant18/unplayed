@@ -2,12 +2,11 @@ import copy
 import pickle
 import sys
 import time
-
-from requests import session
 from banned_tracks import BannedTracksTab
 from datetime import datetime, timedelta
 from exchange import values
 from game import Game
+from helper import log
 from settings import SettingsTab
 from PyQt6.QtCore import QDateTime, QTime, QTimer
 from PyQt6.QtWidgets import (
@@ -369,7 +368,7 @@ class MainWindow(QMainWindow):
         if param is not None:
             param.setEnabled(state == 2)
         if key == "unlimiterver":
-            print(f"check_changed, {state = }")
+            log(f"check_changed, {state = }")
             if state == 2:
                 self.data["track_rules"]["inunlimiter"]["state"] = 2
                 self.data["track_rules"]["inunlimiter"]["value"] = 1
@@ -390,7 +389,7 @@ class MainWindow(QMainWindow):
                 config["track_rules"][rule] = self.data["track_rules"][rule]["value"]
             else:
                 config["track_rules"][rule] = None
-        # print(f"{config = }\n{self.data = }")
+        # log(f"{config = }\n{self.data = }")
         return config
 
     def start(self) -> None:
@@ -450,10 +449,10 @@ class MainWindow(QMainWindow):
             stop_time = self.session.stop_time
 
             if stop_time:
-                max = stop_time.timestamp() - start_time.timestamp()
-                self.time_progress.setMaximum(int(max))
+                max = int(stop_time.timestamp() - start_time.timestamp())
+                self.time_progress.setMaximum(max)
 
-                progress = int(max) - (stop_time.timestamp() - time.time())
+                progress = max - (stop_time.timestamp() - time.time())
                 self.time_progress.setValue(int(progress))
                 self.times.setText(f"{self.session.get_time_left():^10}")
         else:
@@ -507,7 +506,7 @@ class MainWindow(QMainWindow):
             self.data["track_rules"][key]["text"] = values[site][key][track_rule]
 
         self.data["track_rules"][key]["value"] = track_rule
-        print(f"{key} changed to {track_rule}")
+        log(f"{key} changed to {track_rule}")
 
     def save_config(self) -> None:
         with open("data.bin", "wb") as file:

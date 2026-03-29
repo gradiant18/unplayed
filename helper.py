@@ -110,7 +110,7 @@ def get_tracks(session):
                     break
 
             except requests.exceptions.RequestException as e:
-                print(f"API Error fetching tracks: {e}")
+                log(f"API Error fetching tracks: {e}")
                 retries += 1
                 time.sleep(1)
                 continue
@@ -132,9 +132,14 @@ def detect_uid_clash(processed_uids, tracks):
         if track.uid in processed_uids["uids"]:
             # no replay, do care if uid clash
             index = processed_uids["uids"].index(track.uid)
-            print(f"UID clash for {track.track_id} and {processed_uids['ids'][index]}")
+            log(f"UID clash for {track.track_id} and {processed_uids['ids'][index]}")
         else:
             # no replay, no uid clash
             processed_uids["uids"].append(track.uid)
             processed_uids["ids"].append(track.track_id)
     return processed_uids
+
+
+def log(thing):
+    with open("log.log", "a") as file:
+        file.write(f"{thing}\n")

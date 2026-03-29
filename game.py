@@ -2,16 +2,11 @@ import random
 import threading
 import time
 from datetime import datetime
+from helper import get_autosaves, get_tracks, get_uid, save_autosaves, log
 from queue import Queue
 from track import Track
 from watchdog.observers import Observer
 from watchdog.events import PatternMatchingEventHandler
-from helper import (
-    get_autosaves,
-    get_tracks,
-    get_uid,
-    save_autosaves,
-)
 
 
 class Handler(PatternMatchingEventHandler):
@@ -91,11 +86,11 @@ class Game:
                 and len(self.finished) >= 1
                 and len(self.finished) >= self.track_limit
             ):
-                print("Track limit reached")
+                log("Track limit reached")
                 self.stop("Track Limit Reached")
                 break
             if self.stop_time and datetime.now() > self.stop_time:
-                print("Time limit reached")
+                log("Time limit reached")
                 self.stop("Time Limit Reached")
                 break
 
@@ -155,7 +150,7 @@ class Game:
 
         self.autosaves.add(replay_uid)
         self.finished.add(self.current.uid)
-        print(self.finished)
+        log(self.finished)
         self.data["autosaves"] = self.autosaves
         save_autosaves(self.data)
         if len(self.tracks) >= 0 and not self.stop_session:

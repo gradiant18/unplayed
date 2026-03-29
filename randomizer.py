@@ -5,6 +5,10 @@ import sys
 import os
 import pickle
 
+# empty log.txt
+with open("log.log", "w") as file:
+    file.write("")
+
 if os.path.exists("data.bin"):
     with open("data.bin", "rb") as file:
         data = pickle.load(file)
