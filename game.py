@@ -1,3 +1,4 @@
+import os
 import random
 import threading
 import time
@@ -23,7 +24,7 @@ class Game:
         self.config = config
         self.exe = config["exe_path"]
         self.track_dir = config["track_dir"]
-        self.autosave_dir = f"{self.track_dir}/Replays/Autosaves"
+        self.autosave_dir = os.path.join(self.track_dir, "Replays", "Autosaves")
 
         self.start_time = datetime.now()
         self.stop_time = None
