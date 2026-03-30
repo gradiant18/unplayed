@@ -76,7 +76,7 @@ def get_tracks(session):
     autosaves_set = session.autosaves
     current_last = 0
 
-    processed_uids = {"uids": [], "ids": []}
+    processed_uids = {}
     with requests.Session() as http:
         retries = 0
         while not session.stop_session and retries < 5:
@@ -108,6 +108,7 @@ def get_tracks(session):
 
                 if not data.get("More", False):
                     break
+                log(f"Getting more tracks, total so far = {len(session.tracks)}")
 
             except requests.exceptions.RequestException as e:
                 log(f"API Error fetching tracks: {e}")
@@ -124,19 +125,13 @@ def get_tracks(session):
 def detect_uid_clash(processed_uids, tracks):
     for track in tracks:
         if track.wr:
-            # has replay, so don't care if uid clash
-            processed_uids["uids"].append(track.uid)
-            processed_uids["ids"].append(track.track_id)
+            processed_uids[track.uid] = track.track_id
             continue
 
-        if track.uid in processed_uids["uids"]:
-            # no replay, do care if uid clash
-            index = processed_uids["uids"].index(track.uid)
-            log(f"UID clash for {track.track_id} and {processed_uids['ids'][index]}")
+        if track.uid in processed_uids:
+            log(f"UID clash for {track.track_id} and {processed_uids[track.uid]}")
         else:
-            # no replay, no uid clash
-            processed_uids["uids"].append(track.uid)
-            processed_uids["ids"].append(track.track_id)
+            processed_uids[track.uid] = track.track_id
     return processed_uids
 
 
