@@ -51,9 +51,7 @@ class SettingsTab(QWidget):
         self.data["force_window_size"] = state == 2
 
     def open_file_dialog(self):
-        filename = QFileDialog.getOpenFileName(
-            self, "Select TMUF/TMNF Exe", "Exe (*.exe)"
-        )[0]
+        filename = QFileDialog.getOpenFileName(self, "Select TMUF/TMNF Exe")[0]
         if filename:
             self.filename_edit.setText(filename)
             self.data["exe_path"] = filename
