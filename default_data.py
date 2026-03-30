@@ -1,8 +1,8 @@
 import datetime
 
 default_data = {
-    "exe_path": "/home/russell/.local/share/Steam/steamapps/common/TrackMania United/TmForever.exe",
-    "track_dir": "/home/russell/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks",
+        "exe_path": "",
+        "track_dir": "",
     "force_window_size": True,
     "game_rules": {
         "next_mode": "finished",

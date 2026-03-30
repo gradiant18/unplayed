@@ -48,6 +48,7 @@ class Track:
             command = [
                 exe_path,
                 "/singleinst",
+                "/useexedir",
                 f"/file={self.path}",
             ]
         else:
@@ -57,6 +58,7 @@ class Track:
                 "7200",
                 exe_path,
                 "/singleinst",
+                "/useexedir",
                 f"/file={self.path}",
             ]
 
@@ -65,7 +67,10 @@ class Track:
 
     def download(self, track_dir, site):
         # check dir path
-        dir_path = os.path.join(track_dir, "Challenges", "Randomizer", site)
+        randomizer_path = os.path.join(track_dir, "Challenges", "Randomizer")
+        if not os.path.exists(randomizer_path):
+            os.mkdir(randomizer_path)
+        dir_path = os.path.join(randomizer_path, site)
         if not os.path.exists(dir_path):
             os.mkdir(dir_path)
 
