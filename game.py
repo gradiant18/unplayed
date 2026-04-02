@@ -24,7 +24,7 @@ class Game:
         self.config = config
         self.exe = config["exe_path"]
         self.track_dir = config["track_dir"]
-        self.autosave_dir = os.path.join(self.track_dir, "Replays", "Autosaves")
+        self.autosave_dir = os.path.join(config["track_dir"], "Replays", "Autosaves")
 
         self.start_time = datetime.now()
         self.stop_time = None
@@ -72,6 +72,8 @@ class Game:
 
         if self.track_limit == 0:
             self.track_limit = len(self.tracks)
+        elif self.track_limit == -1:
+            self.track_limit = None
 
         threading.Thread(target=self.downloader, daemon=True).start()
 

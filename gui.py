@@ -1,5 +1,6 @@
 import copy
 import pickle
+import os
 import sys
 import time
 from banned_tracks import BannedTracksTab
@@ -67,30 +68,30 @@ class MainWindow(QMainWindow):
         mode.addWidget(self.mode_combo)
 
         # track_limit
-        self.track_label = QLabel(text="Track Limit")
-        self.track_spin = QSpinBox()
-        self.track_spin.setMinimum(0)
-        self.track_spin.setMaximum(1000)
-        self.track_spin.setValue(self.data["game_rules"]["track_limit"])
-        self.track_spin.valueChanged.connect(
+        self.track_limit = QSpinBox()
+        self.track_limit.setMinimum(0)
+        self.track_limit.setMaximum(1000)
+        self.track_limit.setValue(self.data["game_rules"]["track_limit"]["value"])
+        self.track_limit.valueChanged.connect(
             lambda val: self.game_rule_changed("track_limit", val)
         )
+        self.track_box = self.make_checkbox("Track Limit", "track_limit")
         track = QVBoxLayout()
-        track.addWidget(self.track_label)
-        track.addWidget(self.track_spin)
+        track.addWidget(self.track_box)
+        track.addWidget(self.track_limit)
 
         # time_limit
-        self.time_label = QLabel(text="Time Limit")
-        self.time_edit = QTimeEdit()
-        self.time_edit.setDisplayFormat("HH:mm:ss")
-        limit = int(self.data["game_rules"]["time_limit"].total_seconds())
-        self.time_edit.setTime(QTime(0, 0, 0).addSecs(limit))
-        self.time_edit.timeChanged.connect(
+        self.time_limit = QTimeEdit()
+        self.time_limit.setDisplayFormat("HH:mm:ss")
+        limit = int(self.data["game_rules"]["time_limit"]["value"].total_seconds())
+        self.time_limit.setTime(QTime(0, 0, 0).addSecs(limit))
+        self.time_limit.timeChanged.connect(
             lambda val: self.game_rule_changed("time_limit", val)
         )
+        self.time_box = self.make_checkbox("Time Limit", "time_limit")
         tme = QVBoxLayout()
-        tme.addWidget(self.time_label)
-        tme.addWidget(self.time_edit)
+        tme.addWidget(self.time_box)
+        tme.addWidget(self.time_limit)
 
         # site
         self.site_label = QLabel(text="Site")
@@ -311,7 +312,11 @@ class MainWindow(QMainWindow):
 
     def make_checkbox(self, text, label) -> QCheckBox:
         checkbox = QCheckBox(text)
-        checkbox.setChecked(self.data["track_rules"][label]["state"])
+        if self.data["track_rules"].get(label):
+            state = self.data["track_rules"][label]["state"]
+        else:
+            state = self.data["game_rules"][label]["state"]
+        checkbox.setChecked(state)
         checkbox.stateChanged.connect(lambda state: self.check_changed(label, state))
         param = getattr(self, label, None)
         if param is not None:
@@ -365,6 +370,7 @@ class MainWindow(QMainWindow):
 
     def check_changed(self, key, state) -> None:
         param = getattr(self, key, None)
+        print(param)
         if param is not None:
             param.setEnabled(state == 2)
         if key == "unlimiterver":
@@ -378,18 +384,37 @@ class MainWindow(QMainWindow):
             if self.data["track_rules"][key]["text"] == "Any":
                 self.data["track_rules"][key]["state"] = 0
                 return
-
-        self.data["track_rules"][key]["state"] = state
+        if self.data["track_rules"].get(key):
+            self.data["track_rules"][key]["state"] = state
+        else:
+            self.data["game_rules"][key]["state"] = state
 
     def create_config(self) -> dict:
+        if not os.path.exists(self.data["exe_path"]):
+            # TODO: pop up stopping session
+            pass
+        if not os.path.exists(self.data["track_dir"]):
+            # TODO: pop up stopping session
+            pass
         config = copy.deepcopy(self.data)
+        if self.data["game_rules"]["track_limit"]["state"]:
+            limit = self.data["game_rules"]["track_limit"]["value"]
+            config["game_rules"]["track_limit"] = limit
+        else:
+            config["game_rules"]["track_limit"] = -1
+
+        if self.data["game_rules"]["time_limit"]["state"]:
+            limit = self.data["game_rules"]["time_limit"]["value"]
+            config["game_rules"]["time_limit"] = limit
+        else:
+            config["game_rules"]["time_limit"] = timedelta()
+
         for rule in self.data["track_rules"]:
             if self.data["track_rules"][rule]["state"]:
-                # if checked set
                 config["track_rules"][rule] = self.data["track_rules"][rule]["value"]
             else:
                 config["track_rules"][rule] = None
-        # log(f"{config = }\n{self.data = }")
+        print(config)
         return config
 
     def start(self) -> None:

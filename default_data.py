@@ -1,23 +1,25 @@
 import datetime
 
+today = datetime.datetime.today()
+
 default_data = {
-        "exe_path": "",
-        "track_dir": "",
+    "exe_path": "",
+    "track_dir": "",
     "force_window_size": True,
     "game_rules": {
         "next_mode": "finished",
-        "track_limit": 0,
-        "time_limit": datetime.timedelta(minutes=15),
+        "track_limit": {"state": 0, "value": 0},
+        "time_limit": {"state": 2, "value": datetime.timedelta(minutes=15)},
         "site": "TMNF-X",
     },
     "track_rules": {
         "uploadedafter": {
-            "state": 2,
-            "value": datetime.datetime(2010, 2, 1, 0, 0, 0),
+            "state": 0,
+            "value": datetime.datetime(2008, 4, 3, 0, 0, 0),
         },
         "uploadedbefore": {
-            "state": 2,
-            "value": datetime.datetime(2010, 2, 28, 23, 59, 59),
+            "state": 0,
+            "value": datetime.datetime(today.year, today.month, today.day, 23, 59, 59),
         },
         "authortimemin": {
             "state": 0,
@@ -25,7 +27,7 @@ default_data = {
         },
         "authortimemax": {
             "state": 2,
-            "value": 105000,
+            "value": 180000,
         },
         "inunlimiter": {
             "state": 0,

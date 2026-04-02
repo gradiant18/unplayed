@@ -76,7 +76,6 @@ def get_tracks(session):
     autosaves_set = session.autosaves
     current_last = 0
 
-    processed_uids = {}
     with requests.Session() as http:
         retries = 0
         while not session.stop_session and retries < 5:
@@ -102,8 +101,6 @@ def get_tracks(session):
                 if valid_tracks:
                     session.tracks.extend(valid_tracks)
 
-                processed_uids = detect_uid_clash(processed_uids, valid_tracks)
-
                 current_last = results[-1]["TrackId"]
 
                 if not data.get("More", False):
@@ -120,9 +117,11 @@ def get_tracks(session):
     original_limit = session.config["game_rules"].get("track_limit")
     if session.track_limit != original_limit:
         session.track_limit = len(session.tracks)
+    detect_uid_clash(session.tracks)
 
 
-def detect_uid_clash(processed_uids, tracks):
+def detect_uid_clash(tracks):
+    processed_uids = {}
     for track in tracks:
         if track.wr:
             processed_uids[track.uid] = track.track_id

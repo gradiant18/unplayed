@@ -39,8 +39,10 @@ class SettingsTab(QWidget):
         exe.addWidget(self.dir_name_edit, 1, 1)
         exe.addWidget(dir_browse, 1, 2)
 
+        # save
         save = QPushButton("Save")
         save.clicked.connect(self.save_config)
+
         layout = QVBoxLayout()
         layout.addWidget(self.forced_window)
         layout.addLayout(exe)
