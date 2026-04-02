@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
     QMainWindow,
     QPushButton,
     QSpinBox,
+    QStackedWidget,
     QTimeEdit,
     QVBoxLayout,
     QWidget,
@@ -33,24 +34,41 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Randomizer")
         self.data = data
         self.site_tabs = {}
-        options_tab = self.make_options_tab()
-        game_tab = self.make_game_tab()
-        banned_tracks_tab = BannedTracksTab(data)
-        settings_tab = SettingsTab(data)
-        self.tab_widget = QTabWidget()
-        self.tab_widget.addTab(options_tab, "Options")
-        self.tab_widget.addTab(game_tab, "Game")
-        self.tab_widget.addTab(banned_tracks_tab, "Banned Tracks")
-        self.tab_widget.addTab(settings_tab, "Settings")
-        self.tab_widget.setTabEnabled(1, False)
 
-        self.setCentralWidget(self.tab_widget)
+        self.stacked_widget = QStackedWidget()
+        self.setCentralWidget(self.stacked_widget)
+
+        self.make_config_widget()
+        self.make_game_widget()
+
         if self.data["force_window_size"]:
             self.setMinimumSize(self.minimumSizeHint())
             self.setMaximumSize(self.minimumSizeHint())
 
         self.progress_timer = QTimer(self)
         self.progress_timer.timeout.connect(self.update_progress)
+
+    def make_config_widget(self):
+        config_widget = QWidget()
+        layout = QVBoxLayout(config_widget)
+
+        options_tab = self.make_options_tab()
+        banned_tracks_tab = BannedTracksTab(self.data)
+        settings_tab = SettingsTab(self.data)
+
+        self.tabs = QTabWidget()
+        self.tabs.addTab(options_tab, "Options")
+        self.tabs.addTab(banned_tracks_tab, "Banned Tracks")
+        self.tabs.addTab(settings_tab, "Settings")
+        layout.addWidget(self.tabs)
+        self.stacked_widget.addWidget(config_widget)
+
+    def make_game_widget(self):
+        game_widget = QWidget()
+        layout = QVBoxLayout(game_widget)
+        game_tab = self.make_game_tab()
+        layout.addWidget(game_tab)
+        self.stacked_widget.addWidget(game_widget)
 
     def make_options_tab(self) -> QWidget:
         # next_mode
@@ -306,10 +324,6 @@ class MainWindow(QMainWindow):
         tab.setLayout(layout)
         return tab
 
-    def make_settings_tab(self) -> QWidget:
-        tab = QWidget()
-        return tab
-
     def make_checkbox(self, text, label) -> QCheckBox:
         checkbox = QCheckBox(text)
         if self.data["track_rules"].get(label):
@@ -370,7 +384,6 @@ class MainWindow(QMainWindow):
 
     def check_changed(self, key, state) -> None:
         param = getattr(self, key, None)
-        print(param)
         if param is not None:
             param.setEnabled(state == 2)
         if key == "unlimiterver":
@@ -414,7 +427,6 @@ class MainWindow(QMainWindow):
                 config["track_rules"][rule] = self.data["track_rules"][rule]["value"]
             else:
                 config["track_rules"][rule] = None
-        print(config)
         return config
 
     def start(self) -> None:
@@ -430,9 +442,7 @@ class MainWindow(QMainWindow):
         self.progress_timer.start(100)
         self.session.start()
 
-        self.tab_widget.setCurrentIndex(1)
-        self.tab_widget.setTabEnabled(0, False)
-        self.tab_widget.setTabEnabled(1, True)
+        self.stacked_widget.setCurrentIndex(1)
 
     def skip(self) -> None:
         self.session.skip()
@@ -451,9 +461,7 @@ class MainWindow(QMainWindow):
         self.start_button.setStyleSheet("background-color: green")
         self.stop_button.setEnabled(False)
         self.start_button.setEnabled(True)
-        self.tab_widget.setCurrentIndex(0)
-        self.tab_widget.setTabEnabled(0, True)
-        self.tab_widget.setTabEnabled(1, False)
+        self.stacked_widget.setCurrentIndex(0)
 
     def update_progress(self) -> None:
         if self.session.stopped:
