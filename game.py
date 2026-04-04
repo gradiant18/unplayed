@@ -4,7 +4,7 @@ import threading
 import time
 from datetime import datetime
 from helper import get_autosaves, get_tracks, get_uid, save_autosaves, log
-from queue import Queue
+from queue import Queue, Empty, Full
 from track import Track
 from watchdog.observers import Observer
 from watchdog.events import PatternMatchingEventHandler
@@ -21,42 +21,59 @@ class Handler(PatternMatchingEventHandler):
 
 class Game:
     def __init__(self, config):
-        self.config = config
-        self.exe = config["exe_path"]
-        self.track_dir = config["track_dir"]
-        self.autosave_dir = os.path.join(config["track_dir"], "Replays", "Autosaves")
+        self.update_config(config)
 
-        self.start_time = datetime.now()
-        self.stop_time = None
-        self.time_limit = config["game_rules"].get("time_limit")
-        self.track_limit = config["game_rules"].get("track_limit")
-        self.mode = config["game_rules"].get("next_mode", "author")
-        self.site = config["game_rules"].get("site", "TMNF-X")
-        self.save_empty = config["game_rules"].get("save_empty")
-
-        self.track_rules = config.get("track_rules")
-        self.banned_tracks = (
-            config["banned_tracks"][self.site]
-            if config.get("banned_tracks") and config["banned_tracks"].get(self.site)
-            else []
-        )
+        self.autosave_data = get_autosaves(self)
+        self.autosaves = self.autosave_data["autosaves"]
+        self.next = Queue(maxsize=1)
+        self.observer = None
 
         self.tracks = []
         self.finished = set()
-        self.data = get_autosaves(self)
-        self.autosaves = self.data["autosaves"]
-
-        self.next = Queue(maxsize=1)
-        self.observer = None
 
         self.go_next = False
         self.fetching_done = False
         self.stop_session = False
         self.stopped = False
+        self.stop_time = None
         self.stop_reason = None
 
+    def update_config(self, config) -> None:
+        self.config = config
+        self.set_dirs()
+
+    def set_dirs(self) -> None:
+        self.exe = self.config["exe_path"]
+        self.track_dir = self.config["track_dir"]
+        self.autosave_dir = os.path.join(
+            self.config["track_dir"], "Replays", "Autosaves"
+        )
+
     def start(self) -> None:
+        self.next = Queue(maxsize=1)
+        self.tracks = []
+        self.finished = set()
+
+        self.go_next = False
+        self.fetching_done = False
+        self.stop_session = False
+        self.stopped = False
+        self.stop_time = None
+        self.stop_reason = None
+
+        # set options
         self.start_time = datetime.now()
+        self.time_limit = self.config["game_rules"].get("time_limit")
+        self.track_limit = self.config["game_rules"].get("track_limit")
+        self.mode = self.config["game_rules"].get("next_mode", "author")
+        self.site = self.config["game_rules"].get("site", "TMNF-X")
+        self.track_rules = self.config.get("track_rules")
+        self.banned_tracks = (
+            self.config["banned_tracks"][self.site]
+            if self.config.get("banned_tracks")
+            and self.config["banned_tracks"].get(self.site)
+            else []
+        )
         if self.time_limit.total_seconds() > 0:
             self.stop_time = self.start_time + self.time_limit
 
@@ -96,9 +113,12 @@ class Game:
                 break
 
             if self.go_next:
-                self.current = self.next.get()
-                self.current.load(self.config["exe_path"], self.config["debug"])
-                self.go_next = False
+                try:
+                    self.current = self.next.get(timeout=0.5)
+                    self.current.load(self.config["exe_path"], self.config["debug"])
+                    self.go_next = False
+                except Empty:
+                    pass
             time.sleep(0.01)
 
     def stop(self, reason="") -> None:
@@ -108,9 +128,10 @@ class Game:
         if self.observer:
             self.observer.stop()
             self.observer.join()
+            self.observer = None
 
-        self.data["autosaves"] = self.autosaves
-        save_autosaves(self.data)
+        self.autosave_data["autosaves"] = self.autosaves
+        save_autosaves(self.autosave_data)
         self.stopped = True
 
     def skip(self) -> None:
@@ -129,11 +150,16 @@ class Game:
                 continue
 
             track.download(self.track_dir, self.site)
-            self.next.put(track)
+            while not self.stop_session:
+                try:
+                    self.next.put(track, timeout=0.5)
+                    break
+                except Full:
+                    continue
 
     def update_session(self, replay_path) -> None:
         replay_uid = get_uid(replay_path)
-        if self.current.uid != replay_uid:
+        if not hasattr(self, "current") or self.current.uid != replay_uid:
             # different track played
             return
         if self.current.uid in self.autosaves:
@@ -152,8 +178,8 @@ class Game:
         self.autosaves.add(replay_uid)
         self.finished.add(self.current.uid)
         log(f"[FINISHED] {self.finished}")
-        self.data["autosaves"] = self.autosaves
-        save_autosaves(self.data)
+        self.autosave_data["autosaves"] = self.autosaves
+        save_autosaves(self.autosave_data)
         if len(self.tracks) >= 0 and not self.stop_session:
             self.go_next = True
 

@@ -50,6 +50,9 @@ class MainWindow(QMainWindow):
             self.setMinimumSize(self.minimumSizeHint())
             self.setMaximumSize(self.minimumSizeHint())
 
+        self.data["debug"] = len(sys.argv) == 2
+        self.session = Game(self.create_config())
+
         self.progress_timer = QTimer(self)
         self.progress_timer.timeout.connect(self.update_progress)
 
@@ -391,6 +394,7 @@ class MainWindow(QMainWindow):
         combo.currentTextChanged.connect(
             lambda val: self.track_rule_changed(label, val, site)
         )
+        self.update_session_config()
 
     def check_changed(self, key, state) -> None:
         param = getattr(self, key, None)
@@ -406,11 +410,13 @@ class MainWindow(QMainWindow):
                 self.data["track_rules"]["inunlimiter"]["value"] = 0
             if self.data["track_rules"][key]["text"] == "Any":
                 self.data["track_rules"][key]["state"] = 0
+                self.update_session_config()
                 return
         if self.data["track_rules"].get(key):
             self.data["track_rules"][key]["state"] = state
         else:
             self.data["game_rules"][key]["state"] = state
+        self.update_session_config()
 
     def create_config(self) -> dict:
         if not os.path.exists(self.data["exe_path"]):
@@ -431,11 +437,9 @@ class MainWindow(QMainWindow):
         if self.data["game_rules"]["time_limit"]["state"]:
             limit = self.data["game_rules"]["time_limit"]["value"]
             config["game_rules"]["time_limit"] = limit
-            # show self.thing2
             self.time_frame.show()
         else:
             config["game_rules"]["time_limit"] = timedelta()
-            # hide self.thing2
             self.time_frame.hide()
 
         for rule in self.data["track_rules"]:
@@ -445,13 +449,16 @@ class MainWindow(QMainWindow):
                 config["track_rules"][rule] = None
         return config
 
+    def update_session_config(self) -> None:
+        if hasattr(self, "session"):
+            self.session.update_config(self.create_config())
+
     def start(self) -> None:
         self.setWindowTitle("Randomizer")
         self.start_button.setEnabled(False)
 
-        self.data["debug"] = len(sys.argv) == 2
+        self.session.update_config(self.create_config())
 
-        self.session = Game(self.create_config())
         self.progress_timer.start(100)
         self.session.start()
 
@@ -526,6 +533,7 @@ class MainWindow(QMainWindow):
                 self.update_combobox(param, self.site.currentText())
         else:
             self.data["game_rules"][key] = value
+        self.update_session_config()
 
     def track_rule_changed(self, key, value, site="all") -> None:
         track_rule = self.data["track_rules"][key]["value"]
@@ -553,6 +561,7 @@ class MainWindow(QMainWindow):
 
         self.data["track_rules"][key]["value"] = track_rule
         log(f"{key} changed to {track_rule}")
+        self.update_session_config()
 
     def save_config(self) -> None:
         self.status.showMessage("Saving...")
