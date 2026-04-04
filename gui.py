@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QProgressBar,
     QTabWidget,
+    QStatusBar,
 )
 
 
@@ -33,6 +34,9 @@ class MainWindow(QMainWindow):
     def __init__(self, data) -> None:
         super().__init__()
         self.setWindowTitle("Randomizer")
+        self.status = QStatusBar()
+        self.setStatusBar(self.status)
+
         self.data = data
         self.site_tabs = {}
 
@@ -76,9 +80,11 @@ class MainWindow(QMainWindow):
         self.mode_label = QLabel(text="Next Mode")
         self.mode_combo = QComboBox()
         self.mode_combo.addItems(values["all"]["mode"])
-        self.mode_combo.setCurrentText(
-            self.data["game_rules"]["next_mode"].capitalize()
-        )
+        next_mode = self.data["game_rules"]["next_mode"]
+        if next_mode != "wr":
+            self.mode_combo.setCurrentText(next_mode.capitalize())
+        else:
+            self.mode_combo.setCurrentText("WR")
         self.mode_combo.currentTextChanged.connect(
             lambda val: self.game_rule_changed("next_mode", val.lower())
         )
@@ -313,9 +319,8 @@ class MainWindow(QMainWindow):
         self.skip_button.clicked.connect(self.skip)
 
         self.stop_button = QPushButton("Stop")
-        self.stop_button.setStyleSheet("background-color: grey")
+        self.stop_button.setStyleSheet("background-color: red")
         self.stop_button.clicked.connect(self.stop)
-        self.stop_button.setEnabled(False)
 
         buttons = QHBoxLayout()
         buttons.addWidget(self.reload_button)
@@ -442,9 +447,6 @@ class MainWindow(QMainWindow):
 
     def start(self) -> None:
         self.setWindowTitle("Randomizer")
-        self.stop_button.setStyleSheet("background-color: red")
-        self.start_button.setStyleSheet("background-color: grey")
-        self.stop_button.setEnabled(True)
         self.start_button.setEnabled(False)
 
         self.data["debug"] = len(sys.argv) == 2
@@ -466,11 +468,8 @@ class MainWindow(QMainWindow):
         self.save_config()
 
         if reason := self.session.stop_reason:
-            self.setWindowTitle(f"Randomizer | {reason}")
+            self.status.showMessage(reason, 5000)
 
-        self.stop_button.setStyleSheet("background-color: grey")
-        self.start_button.setStyleSheet("background-color: green")
-        self.stop_button.setEnabled(False)
         self.start_button.setEnabled(True)
         self.stacked_widget.setCurrentIndex(0)
 
@@ -500,12 +499,16 @@ class MainWindow(QMainWindow):
                 self.time_label.setText(f"{self.session.get_time_left():^10}")
 
         try:
+            name = self.session.current.name
             track = self.session.current.track_id
-            target = self.session.current.medals.get(self.session.mode)
-            if not target:
-                self.setWindowTitle(f"Randomizer | {track}")
+            if self.session.mode != "wr":
+                target = self.session.current.medals.get(self.session.mode)
             else:
-                self.setWindowTitle(f"Randomizer | {track} | {target}")
+                target = self.session.current.wr
+            if not target:
+                self.setWindowTitle(f"{name} | {track}")
+            else:
+                self.setWindowTitle(f"{name} | {track} | {target / 1000}s")
         except AttributeError:
             # current wasn't initialized yet
             pass
@@ -552,5 +555,7 @@ class MainWindow(QMainWindow):
         log(f"{key} changed to {track_rule}")
 
     def save_config(self) -> None:
+        self.status.showMessage("Saving...")
         with open("data.bin", "wb") as file:
             pickle.dump(self.data, file)
+        self.status.showMessage("Saved!", 3000)
