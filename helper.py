@@ -114,8 +114,8 @@ def get_tracks(session):
                 continue
 
     session.fetching_done = True
-    original_limit = session.config["game_rules"].get("track_limit")
-    if session.track_limit != original_limit:
+    original_limit = session.config["game_rules"]["track_limit"]
+    if not original_limit or session.track_limit > len(session.tracks):
         session.track_limit = len(session.tracks)
     detect_uid_clash(session.tracks)
 

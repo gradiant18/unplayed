@@ -72,8 +72,6 @@ class Game:
 
         if self.track_limit == 0:
             self.track_limit = len(self.tracks)
-        elif self.track_limit == -1:
-            self.track_limit = None
 
         threading.Thread(target=self.downloader, daemon=True).start()
 

@@ -87,7 +87,7 @@ class MainWindow(QMainWindow):
 
         # track_limit
         self.track_limit = QSpinBox()
-        self.track_limit.setMinimum(0)
+        self.track_limit.setMinimum(1)
         self.track_limit.setMaximum(1000)
         self.track_limit.setValue(self.data["game_rules"]["track_limit"]["value"])
         self.track_limit.valueChanged.connect(
@@ -409,12 +409,14 @@ class MainWindow(QMainWindow):
         if not os.path.exists(self.data["track_dir"]):
             # TODO: pop up stopping session
             pass
+
         config = copy.deepcopy(self.data)
+
         if self.data["game_rules"]["track_limit"]["state"]:
             limit = self.data["game_rules"]["track_limit"]["value"]
             config["game_rules"]["track_limit"] = limit
         else:
-            config["game_rules"]["track_limit"] = -1
+            config["game_rules"]["track_limit"] = 0
 
         if self.data["game_rules"]["time_limit"]["state"]:
             limit = self.data["game_rules"]["time_limit"]["value"]
@@ -488,8 +490,6 @@ class MainWindow(QMainWindow):
                 progress = max - (stop_time.timestamp() - time.time())
                 self.time_progress.setValue(int(progress))
                 self.times.setText(f"{self.session.get_time_left():^10}")
-        else:
-            self.times.setText("          ")
 
         try:
             track = self.session.current.track_id
@@ -504,9 +504,11 @@ class MainWindow(QMainWindow):
 
     def game_rule_changed(self, key, value) -> None:
         if key == "time_limit":
-            self.data["game_rules"][key] = timedelta(
+            self.data["game_rules"][key]["value"] = timedelta(
                 hours=value.hour(), minutes=value.minute(), seconds=value.second()
             )
+        elif key == "track_limit":
+            self.data["game_rules"][key]["value"] = value
         elif key == "site":
             self.data["game_rules"][key] = value
             for param in ["tag", "primarytype", "environment"]:

@@ -95,7 +95,7 @@ class Track:
                 retries += 1
                 time.sleep(1)
             except requests.RequestException as e:
-                print(f"Retry {retries + 1}/3 failed: {e}")
+                # print(f"Retry {retries + 1}/3 failed: {e}")
                 retries += 1
                 time.sleep(1)
         return
