@@ -105,10 +105,10 @@ def get_tracks(session):
 
                 if not data.get("More", False):
                     break
-                log(f"Getting more tracks, total so far = {len(session.tracks)}")
+                log(f"[API] Getting more tracks, total so far = {len(session.tracks)}")
 
             except requests.exceptions.RequestException as e:
-                log(f"API Error fetching tracks: {e}")
+                log(f"[API] Error fetching tracks: {e}")
                 retries += 1
                 time.sleep(1)
                 continue
@@ -128,7 +128,7 @@ def detect_uid_clash(tracks):
             continue
 
         if track.uid in processed_uids:
-            log(f"UID clash for {track.track_id} and {processed_uids[track.uid]}")
+            log(f"[UID] Clash for {track.track_id} and {processed_uids[track.uid]}")
         else:
             processed_uids[track.uid] = track.track_id
     return processed_uids

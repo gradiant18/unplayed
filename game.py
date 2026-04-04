@@ -87,11 +87,11 @@ class Game:
                 and len(self.finished) >= 1
                 and len(self.finished) >= self.track_limit
             ):
-                log("Track limit reached")
+                log("[STOP] Track limit reached")
                 self.stop("Track Limit Reached")
                 break
             if self.stop_time and datetime.now() > self.stop_time:
-                log("Time limit reached")
+                log("[STOP] Time limit reached")
                 self.stop("Time Limit Reached")
                 break
 
@@ -151,7 +151,7 @@ class Game:
 
         self.autosaves.add(replay_uid)
         self.finished.add(self.current.uid)
-        log(self.finished)
+        log(f"[FINISHED] {self.finished}")
         self.data["autosaves"] = self.autosaves
         save_autosaves(self.data)
         if len(self.tracks) >= 0 and not self.stop_session:

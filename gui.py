@@ -13,6 +13,7 @@ from PyQt6.QtCore import QDateTime, QTime, QTimer
 from PyQt6.QtWidgets import (
     QCheckBox,
     QDateTimeEdit,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -281,23 +282,27 @@ class MainWindow(QMainWindow):
 
     def make_game_tab(self) -> QWidget:
         # Tab 2
-        self.tracks = QLabel()
-        self.track_progress = QProgressBar()
-        self.track_progress.setValue(0)
-        thing1 = QHBoxLayout()
-        thing1.addWidget(self.tracks)
-        thing1.addWidget(self.track_progress)
+        self.track_label = QLabel()
+        self.track_progress_bar = QProgressBar()
+        self.track_progress_bar.setValue(0)
+        track_progress = QHBoxLayout()
+        track_progress.addWidget(self.track_label)
+        track_progress.addWidget(self.track_progress_bar)
+        self.track_frame = QFrame()
+        self.track_frame.setLayout(track_progress)
 
-        self.times = QLabel()
-        self.time_progress = QProgressBar()
-        self.time_progress.setValue(0)
-        thing2 = QHBoxLayout()
-        thing2.addWidget(self.times)
-        thing2.addWidget(self.time_progress)
+        self.time_label = QLabel()
+        self.time_progress_bar = QProgressBar()
+        self.time_progress_bar.setValue(0)
+        time_progress = QHBoxLayout()
+        time_progress.addWidget(self.time_label)
+        time_progress.addWidget(self.time_progress_bar)
+        self.time_frame = QFrame()
+        self.time_frame.setLayout(time_progress)
 
-        bars = QVBoxLayout()
-        bars.addLayout(thing1)
-        bars.addLayout(thing2)
+        self.bars = QVBoxLayout()
+        self.bars.addWidget(self.track_frame)
+        self.bars.addWidget(self.time_frame)
 
         self.reload_button = QPushButton("Reload Track")
         self.reload_button.setStyleSheet("background-color: yellow")
@@ -318,7 +323,7 @@ class MainWindow(QMainWindow):
         buttons.addWidget(self.stop_button)
 
         layout = QVBoxLayout()
-        layout.addLayout(bars)
+        layout.addLayout(self.bars)
         layout.addLayout(buttons)
         tab = QWidget()
         tab.setLayout(layout)
@@ -421,8 +426,12 @@ class MainWindow(QMainWindow):
         if self.data["game_rules"]["time_limit"]["state"]:
             limit = self.data["game_rules"]["time_limit"]["value"]
             config["game_rules"]["time_limit"] = limit
+            # show self.thing2
+            self.time_frame.show()
         else:
             config["game_rules"]["time_limit"] = timedelta()
+            # hide self.thing2
+            self.time_frame.hide()
 
         for rule in self.data["track_rules"]:
             if self.data["track_rules"][rule]["state"]:
@@ -472,12 +481,11 @@ class MainWindow(QMainWindow):
             return
 
         if self.session.track_limit:
-            self.track_progress.setEnabled(True)
-            self.track_progress.setMaximum(self.session.track_limit)
-            self.track_progress.setValue(len(self.session.finished))
+            self.track_progress_bar.setMaximum(self.session.track_limit)
+            self.track_progress_bar.setValue(len(self.session.finished))
 
             progress = f"{len(self.session.finished)}/{self.session.track_limit}"
-            self.tracks.setText(f"{progress:^10}")
+            self.track_label.setText(f"{progress:^10}")
 
         if self.session.time_limit:
             start_time = self.session.start_time
@@ -485,11 +493,11 @@ class MainWindow(QMainWindow):
 
             if stop_time:
                 max = int(stop_time.timestamp() - start_time.timestamp())
-                self.time_progress.setMaximum(max)
+                self.time_progress_bar.setMaximum(max)
 
                 progress = max - (stop_time.timestamp() - time.time())
-                self.time_progress.setValue(int(progress))
-                self.times.setText(f"{self.session.get_time_left():^10}")
+                self.time_progress_bar.setValue(int(progress))
+                self.time_label.setText(f"{self.session.get_time_left():^10}")
 
         try:
             track = self.session.current.track_id
