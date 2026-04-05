@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
 )
 import pickle
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from exchange import values
 import csv
 import re
@@ -42,6 +43,9 @@ class BannedTracksTab(QWidget):
         layout.addWidget(self.text_input)
         layout.addLayout(buttons)
         self.setLayout(layout)
+
+        if self.data["auto_update"]:
+            self.update_banned_tracks()
 
     def banned_tracks_changed(self) -> None:
         for site in self.site_tabs:
@@ -154,17 +158,36 @@ class BannedTracksTab(QWidget):
                 self.site_tabs[site].setText("")
 
     def update_banned_tracks(self) -> None:
-        # update banned tracks from cheated track spread sheet
         self.data["banned_tracks"] = self.get_cheated_ids()
-        for site in self.site_tabs:
-            site_ids = ""
-            for track_id in self.data["banned_tracks"].get(site):
-                site_ids += f"{track_id}\n"
-            self.site_tabs[site].textChanged.disconnect()
-            self.site_tabs[site].setText(site_ids)
-            self.site_tabs[site].textChanged.connect(self.banned_tracks_changed)
 
-    def get_cheated_ids(self):
+        for site, tab in self.site_tabs.items():
+            track_ids = self.data["banned_tracks"].get(site, [])
+            site_ids = "\n".join(map(str, track_ids)) + ("\n" if track_ids else "")
+
+            tab.textChanged.disconnect()
+            tab.setText(site_ids)
+            tab.textChanged.connect(self.banned_tracks_changed)
+
+    def fetch_sheet_data(self, session, sheet_id, page_name, page_gid) -> tuple:
+        url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&tq&gid={page_gid}"
+        response = session.get(url)
+        response.raise_for_status()
+
+        reader = csv.reader(StringIO(response.text))
+        ids = []
+
+        for row in reader:
+            if len(row) > 1:
+                val = row[1].strip()
+                if val and val != "TrackID":
+                    try:
+                        ids.append(int(val))
+                    except ValueError:
+                        continue
+
+        return page_name, ids
+
+    def get_cheated_ids(self) -> dict:
         sheet_id = "1fqmzFGPIFBlJuxlwnPJSh1nCTTxqWXtHtvP5OUxE4Ow"
         page_ids = {
             "TMUF-X": 2132753700,
@@ -173,18 +196,20 @@ class BannedTracksTab(QWidget):
             "TMS-X": 1438334892,
             "TMN-X": 38022687,
         }
+
         cheated_ids = {}
-        for page_id in page_ids:
-            url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&tq&gid={page_ids[page_id]}"
-            response = requests.get(url)
-            response.raise_for_status()
-            reader = csv.reader(StringIO(response.text))
-            ids = []
-            for row in reader:
-                if not row[1] or row[1] == "TrackID " or row[1] == "TrackID":
-                    continue
-                ids.append(int(row[1]))
-            cheated_ids[page_id] = ids
+
+        with requests.Session() as session:
+            with ThreadPoolExecutor(max_workers=5) as executor:
+                futures = [
+                    executor.submit(self.fetch_sheet_data, session, sheet_id, name, gid)
+                    for name, gid in page_ids.items()
+                ]
+
+                for future in as_completed(futures):
+                    page_name, ids = future.result()
+                    cheated_ids[page_name] = ids
+
         return cheated_ids
 
     def save_config(self) -> None:

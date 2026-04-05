@@ -6,6 +6,7 @@ default_data = {
     "exe_path": "",
     "track_dir": "",
     "force_window_size": True,
+    "auto_update": True,
     "game_rules": {
         "next_mode": "finished",
         "track_limit": {"state": 0, "value": 0},

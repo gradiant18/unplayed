@@ -20,6 +20,11 @@ class SettingsTab(QWidget):
         self.forced_window.setChecked(self.data["force_window_size"])
         self.forced_window.stateChanged.connect(lambda state: self.change_window(state))
 
+        # auto update banned tracks
+        self.auto_update = QCheckBox("Auto Update Banned Tracks")
+        self.auto_update.setChecked(self.data["auto_update"])
+        self.auto_update.stateChanged.connect(lambda state: self.change_update(state))
+
         # exe path
         file_browse = QPushButton("Browse")
         file_browse.clicked.connect(self.open_file_dialog)
@@ -47,20 +52,16 @@ class SettingsTab(QWidget):
 
         layout = QVBoxLayout()
         layout.addWidget(self.forced_window)
+        layout.addWidget(self.auto_update)
         layout.addLayout(exe)
         layout.addWidget(save)
         self.setLayout(layout)
 
-    def path_changed(self):
-        self.data["exe_path"] = self.filename_edit.text()
-        self.data["track_dir"] = self.dir_name_edit.text()
-
-    def update_paths(self):
-        self.filename_edit.setText(self.data["exe_path"])
-        self.dir_name_edit.setText(self.data["track_dir"])
-
     def change_window(self, state):
         self.data["force_window_size"] = state == 2
+
+    def change_update(self, state):
+        self.data["auto_update"] = state == 2
 
     def open_file_dialog(self):
         filename = QFileDialog.getOpenFileName(self, "Select TMUF/TMNF Exe")[0]
@@ -73,6 +74,14 @@ class SettingsTab(QWidget):
         if dir_name:
             self.dir_name_edit.setText(dir_name)
             self.data["track_dir"] = dir_name
+
+    def path_changed(self):
+        self.data["exe_path"] = self.filename_edit.text()
+        self.data["track_dir"] = self.dir_name_edit.text()
+
+    def update_paths(self):
+        self.filename_edit.setText(self.data["exe_path"])
+        self.dir_name_edit.setText(self.data["track_dir"])
 
     def save_config(self) -> None:
         with open("data.bin", "wb") as file:
