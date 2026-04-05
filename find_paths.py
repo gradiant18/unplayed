@@ -88,7 +88,8 @@ class FindTracks(QDialog):
 
         if platform.system() == "Windows":
             dir_paths = [
-                os.path.join(str(os.getenv("HOMEPATH")), "Documents", "TrackMania")
+                os.path.join(str(os.getenv("HOMEPATH")), "Documents", "TrackMania", "Tracks"),
+                os.path.join(str(os.getenv("HOMEPATH")), "OneDrive", "Documents", "TrackMania", "Tracks")
             ]
         elif platform.system() == "Linux":
             dir_paths = [
@@ -100,7 +101,7 @@ class FindTracks(QDialog):
                 ),
             ]
         else:
-            return  # Unsupported OS
+            return
 
         for path in dir_paths:
             if os.path.exists(path):
