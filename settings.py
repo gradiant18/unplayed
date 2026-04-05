@@ -25,6 +25,7 @@ class SettingsTab(QWidget):
         file_browse.clicked.connect(self.open_file_dialog)
         self.filename_edit = QLineEdit()
         self.filename_edit.setText(self.data["exe_path"])
+        self.filename_edit.textEdited.connect(self.path_changed)
         exe = QGridLayout()
         exe.addWidget(QLabel("Exe Path:"), 0, 0)
         exe.addWidget(self.filename_edit, 0, 1)
@@ -35,6 +36,7 @@ class SettingsTab(QWidget):
         dir_browse.clicked.connect(self.open_dir_dialog)
         self.dir_name_edit = QLineEdit()
         self.dir_name_edit.setText(self.data["track_dir"])
+        self.dir_name_edit.textEdited.connect(self.path_changed)
         exe.addWidget(QLabel("Track Dir:"), 1, 0)
         exe.addWidget(self.dir_name_edit, 1, 1)
         exe.addWidget(dir_browse, 1, 2)
@@ -48,6 +50,14 @@ class SettingsTab(QWidget):
         layout.addLayout(exe)
         layout.addWidget(save)
         self.setLayout(layout)
+
+    def path_changed(self):
+        self.data["exe_path"] = self.filename_edit.text()
+        self.data["track_dir"] = self.dir_name_edit.text()
+
+    def update_paths(self):
+        self.filename_edit.setText(self.data["exe_path"])
+        self.dir_name_edit.setText(self.data["track_dir"])
 
     def change_window(self, state):
         self.data["force_window_size"] = state == 2

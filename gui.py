@@ -1,11 +1,12 @@
 import copy
-import pickle
 import os
+import pickle
 import sys
 import time
 from banned_tracks import BannedTracksTab
 from datetime import datetime, timedelta
 from exchange import values
+from find_paths import FindExe, FindTracks
 from game import Game
 from helper import log
 from settings import SettingsTab
@@ -17,6 +18,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMainWindow,
+    QMessageBox,
     QPushButton,
     QSpinBox,
     QStackedWidget,
@@ -62,12 +64,12 @@ class MainWindow(QMainWindow):
 
         options_tab = self.make_options_tab()
         banned_tracks_tab = BannedTracksTab(self.data)
-        settings_tab = SettingsTab(self.data)
+        self.settings_tab = SettingsTab(self.data)
 
         self.tabs = QTabWidget()
         self.tabs.addTab(options_tab, "Options")
         self.tabs.addTab(banned_tracks_tab, "Banned Tracks")
-        self.tabs.addTab(settings_tab, "Settings")
+        self.tabs.addTab(self.settings_tab, "Settings")
         layout.addWidget(self.tabs)
         self.stacked_widget.addWidget(config_widget)
 
@@ -419,12 +421,29 @@ class MainWindow(QMainWindow):
         self.update_session_config()
 
     def create_config(self) -> dict:
-        if not os.path.exists(self.data["exe_path"]):
-            # TODO: pop up stopping session
-            pass
-        if not os.path.exists(self.data["track_dir"]):
-            # TODO: pop up stopping session
-            pass
+        while not os.path.exists(self.data["exe_path"]):
+            dialog = FindExe(self)
+            if dialog.exec():
+                self.data["exe_path"] = dialog.executable_path
+                break
+            else:
+                QMessageBox().information(
+                    self,
+                    "No Executable",
+                    "You must select an executable",
+                )
+        while not os.path.exists(self.data["track_dir"]):
+            dialog = FindTracks(self)
+            if dialog.exec():
+                self.data["track_dir"] = dialog.track_folder_path
+                break
+            else:
+                QMessageBox().information(
+                    self,
+                    "No Track Directory",
+                    "You must select a track directory",
+                )
+        self.settings_tab.update_paths()
 
         config = copy.deepcopy(self.data)
 
@@ -456,9 +475,9 @@ class MainWindow(QMainWindow):
     def start(self) -> None:
         self.setWindowTitle("Randomizer")
         self.start_button.setEnabled(False)
+        self.status.showMessage("Starting...")
 
         self.session.update_config(self.create_config())
-
         self.progress_timer.start(100)
         self.session.start()
 
@@ -513,9 +532,9 @@ class MainWindow(QMainWindow):
             else:
                 target = self.session.current.wr
             if not target:
-                self.setWindowTitle(f"{name} | {track}")
+                self.status.showMessage(f"{name} | {track}")
             else:
-                self.setWindowTitle(f"{name} | {track} | {target / 1000}s")
+                self.status.showMessage(f"{name} | {track} | {target / 1000}s")
         except AttributeError:
             # current wasn't initialized yet
             pass
