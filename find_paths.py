@@ -1,5 +1,6 @@
 import os
 import platform
+import sys
 from PyQt6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -60,7 +61,13 @@ class FindExe(QDialog):
 
         other_button = QPushButton("Other Path")
         other_button.clicked.connect(self.open_file_dialog)
-        self.main_layout.addWidget(other_button)
+        cancel_button = QPushButton("Cancel")
+        cancel_button.clicked.connect(self.cancel)
+
+        row = QHBoxLayout()
+        row.addWidget(other_button)
+        row.addWidget(cancel_button)
+        self.main_layout.addLayout(row)
 
     def return_path(self, path):
         self.executable_path = path
@@ -70,6 +77,9 @@ class FindExe(QDialog):
         filepath = QFileDialog.getOpenFileName(self, "Select TmForever.exe")[0]
         if filepath:
             self.return_path(filepath)
+
+    def cancel(self):
+        sys.exit()
 
 
 class FindTracks(QDialog):
@@ -88,8 +98,16 @@ class FindTracks(QDialog):
 
         if platform.system() == "Windows":
             dir_paths = [
-                os.path.join(str(os.getenv("HOMEPATH")), "Documents", "TrackMania", "Tracks"),
-                os.path.join(str(os.getenv("HOMEPATH")), "OneDrive", "Documents", "TrackMania", "Tracks")
+                os.path.join(
+                    str(os.getenv("HOMEPATH")), "Documents", "TrackMania", "Tracks"
+                ),
+                os.path.join(
+                    str(os.getenv("HOMEPATH")),
+                    "OneDrive",
+                    "Documents",
+                    "TrackMania",
+                    "Tracks",
+                ),
             ]
         elif platform.system() == "Linux":
             dir_paths = [
@@ -109,17 +127,23 @@ class FindTracks(QDialog):
 
     def display_paths(self):
         for path in self.track_folder_paths:
-            row = QHBoxLayout()
             label = QLabel(path)
             button = QPushButton("Select")
             button.clicked.connect(lambda _, p=path: self.return_path(p))
+            row = QHBoxLayout()
             row.addWidget(label)
             row.addWidget(button)
             self.main_layout.addLayout(row)
 
         other_button = QPushButton("Other Path")
         other_button.clicked.connect(self.open_file_dialog)
-        self.main_layout.addWidget(other_button)
+        cancel_button = QPushButton("Cancel")
+        cancel_button.clicked.connect(self.cancel)
+
+        row = QHBoxLayout()
+        row.addWidget(other_button)
+        row.addWidget(cancel_button)
+        self.main_layout.addLayout(row)
 
     def return_path(self, path):
         self.track_folder_path = path
@@ -129,3 +153,6 @@ class FindTracks(QDialog):
         folder_path = QFileDialog.getExistingDirectory(self, "Select Tracks Folder")
         if folder_path:
             self.return_path(folder_path)
+
+    def cancel(self):
+        sys.exit()
