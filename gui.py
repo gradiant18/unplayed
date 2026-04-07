@@ -10,7 +10,7 @@ from find_paths import FindExe, FindTracks
 from game import Game
 from helper import log
 from settings import SettingsTab
-from PyQt6.QtCore import QDateTime, QTime, QTimer
+from PyQt6.QtCore import QDateTime, QTime, QTimer, Qt
 from PyQt6.QtWidgets import (
     QCheckBox,
     QDateTimeEdit,
@@ -292,7 +292,7 @@ class MainWindow(QMainWindow):
         return tab
 
     def make_game_tab(self) -> QWidget:
-        # Tab 2
+        # track progress
         self.track_label = QLabel()
         self.track_progress_bar = QProgressBar()
         self.track_progress_bar.setValue(0)
@@ -302,6 +302,7 @@ class MainWindow(QMainWindow):
         self.track_frame = QFrame()
         self.track_frame.setLayout(track_progress)
 
+        # time progress
         self.time_label = QLabel()
         self.time_progress_bar = QProgressBar()
         self.time_progress_bar.setValue(0)
@@ -315,14 +316,17 @@ class MainWindow(QMainWindow):
         self.bars.addWidget(self.track_frame)
         self.bars.addWidget(self.time_frame)
 
+        # reload track
         self.reload_button = QPushButton("Reload Track")
         self.reload_button.setStyleSheet("background-color: yellow")
         self.reload_button.clicked.connect(self.reload)
 
+        # skip track
         self.skip_button = QPushButton("Skip Track")
         self.skip_button.setStyleSheet("background-color: orange")
         self.skip_button.clicked.connect(self.skip)
 
+        # stop session
         self.stop_button = QPushButton("Stop")
         self.stop_button.setStyleSheet("background-color: red")
         self.stop_button.clicked.connect(self.stop)
@@ -332,8 +336,12 @@ class MainWindow(QMainWindow):
         buttons.addWidget(self.skip_button)
         buttons.addWidget(self.stop_button)
 
+        self.track_info = QLabel()
+        self.track_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
         layout = QVBoxLayout()
         layout.addLayout(self.bars)
+        layout.addWidget(self.track_info)
         layout.addLayout(buttons)
         tab = QWidget()
         tab.setLayout(layout)
@@ -475,13 +483,15 @@ class MainWindow(QMainWindow):
     def start(self) -> None:
         self.setWindowTitle("Randomizer")
         self.start_button.setEnabled(False)
-        self.status.showMessage("Starting...")
 
         self.session.update_config(self.create_config())
         self.progress_timer.start(100)
         self.session.start()
 
         self.stacked_widget.setCurrentIndex(1)
+        if self.data["force_window_size"]:
+            self.setMinimumHeight(220)
+            self.setMaximumHeight(220)
 
     def skip(self) -> None:
         self.session.skip()
@@ -498,6 +508,9 @@ class MainWindow(QMainWindow):
 
         self.start_button.setEnabled(True)
         self.stacked_widget.setCurrentIndex(0)
+        if self.data["force_window_size"]:
+            self.setMinimumSize(self.minimumSizeHint())
+            self.setMaximumSize(self.minimumSizeHint())
 
     def update_progress(self) -> None:
         if self.session.stopped:
@@ -532,9 +545,9 @@ class MainWindow(QMainWindow):
             else:
                 target = self.session.current.wr
             if not target:
-                self.status.showMessage(f"{name} | {track}")
+                self.track_info.setText(f"{name} | {track}")
             else:
-                self.status.showMessage(f"{name} | {track} | {target / 1000}s")
+                self.track_info.setText(f"{name} | {track} | {target / 1000}s")
         except AttributeError:
             # current wasn't initialized yet
             pass
@@ -579,7 +592,7 @@ class MainWindow(QMainWindow):
             self.data["track_rules"][key]["text"] = values[site][key][track_rule]
 
         self.data["track_rules"][key]["value"] = track_rule
-        log(f"{key} changed to {track_rule}")
+        log(f"[OPTION] {key} changed to {track_rule}")
         self.update_session_config()
 
     def save_config(self) -> None:

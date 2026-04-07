@@ -29,7 +29,7 @@ class Game:
         self.observer = None
 
         self.tracks = []
-        self.finished = set()
+        self.finished = {}
 
         self.go_next = False
         self.fetching_done = False
@@ -52,7 +52,7 @@ class Game:
     def start(self) -> None:
         self.next = Queue(maxsize=1)
         self.tracks = []
-        self.finished = set()
+        self.finished = {}
 
         self.go_next = False
         self.fetching_done = False
@@ -176,7 +176,7 @@ class Game:
                     return
 
         self.autosaves.add(replay_uid)
-        self.finished.add(self.current.uid)
+        self.finished.update({self.current.uid: self.current.medal})
         log(f"[FINISHED] {self.finished}")
         self.autosave_data["autosaves"] = self.autosaves
         save_autosaves(self.autosave_data)
