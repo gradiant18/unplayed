@@ -26,8 +26,8 @@ class BannedTracksTab(QWidget):
 
         save = QPushButton("Save")
         save.clicked.connect(self.save_config)
-        load = QPushButton("Load")
-        load.clicked.connect(self.load_banned_tracks)
+        load = QPushButton("Import")
+        load.clicked.connect(self.import_banned_tracks)
         export = QPushButton("Export")
         export.clicked.connect(self.export_banned_tracks)
         clear = QPushButton("Clear")
@@ -103,8 +103,8 @@ class BannedTracksTab(QWidget):
 
         return ids
 
-    def load_banned_tracks(self) -> None:
-        # replace banned tracks from file
+    def import_banned_tracks(self) -> None:
+        # import banned tracks from file
         file_dialog = QFileDialog(self)
         file_dialog.setWindowTitle("Open File")
         file_dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
@@ -113,15 +113,20 @@ class BannedTracksTab(QWidget):
         if file_dialog.exec():
             path = file_dialog.selectedFiles()[0]
             ids = self.get_ids_from_file(path)
-            self.data["banned_tracks"].update(ids)
-            for site in self.site_tabs:
+            for site in ids:
+                # update banned tracks
+                current_ids = list(self.data["banned_tracks"][site])
+                current_ids.extend(list(ids[site]))
+                current_ids = set(current_ids)
+                self.data["banned_tracks"][site] = current_ids
+
+                # update tabs
                 text = ""
-                if not ids.get(site):
-                    self.site_tabs[site].setText("")
-                    continue
-                for id in ids[site]:
+                for id in current_ids:
                     text += f"{id}\n"
                 self.site_tabs[site].setText(text)
+                if site == "TMN-X":
+                    print(self.data["banned_tracks"][site], current_ids, ids[site])
 
     def export_banned_tracks(self) -> None:
         # save banned tracks to file

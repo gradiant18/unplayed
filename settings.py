@@ -16,7 +16,7 @@ class SettingsTab(QWidget):
         super().__init__()
         self.data = data
         # force window size true/false
-        self.forced_window = QCheckBox("Force Window Size")
+        self.forced_window = QCheckBox("Force Window Size (Requires Restart)")
         self.forced_window.setChecked(self.data["force_window_size"])
         self.forced_window.stateChanged.connect(lambda state: self.change_window(state))
 
