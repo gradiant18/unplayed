@@ -202,27 +202,3 @@ class Game:
             return self.current
         except AttributeError:
             return None
-
-    def __str__(self) -> str:
-        if not self.get_current():
-            return ""
-
-        tracks_played = f"Tracks Played: {len(self.finished)} | "
-
-        tracks_left = ""
-        if self.track_limit:
-            tracks_left = f"Tracks Left: {self.get_tracks_left()} | "
-
-        time_left = ""
-        if self.stop_time:
-            time_left = f"Time Left: {self.get_time_left()} | "
-
-        current_medal = ""
-        if self.mode != "finished" or "bronze":
-            medal = "None"
-            if self.current.medal:
-                medal = self.current.medal.capitalize()
-            current_medal = f"Current Medal: {medal} | "
-
-        current_track = f"Current Track: {self.current.name}"
-        return f"{tracks_played}{tracks_left}{time_left}{current_medal}{current_track}"

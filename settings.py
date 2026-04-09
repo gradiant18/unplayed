@@ -8,13 +8,13 @@ from PyQt6.QtWidgets import (
     QWidget,
     QPushButton,
 )
-import pickle
 
 
 class SettingsTab(QWidget):
-    def __init__(self, data):
+    def __init__(self, main_window):
         super().__init__()
-        self.data = data
+        self.parent = main_window
+        self.data = self.parent.data
         # force window size true/false
         self.forced_window = QCheckBox("Force Window Size (Requires Restart)")
         self.forced_window.setChecked(self.data["force_window_size"])
@@ -48,7 +48,7 @@ class SettingsTab(QWidget):
 
         # save
         save = QPushButton("Save")
-        save.clicked.connect(self.save_config)
+        save.clicked.connect(self.parent.save_config)
 
         layout = QVBoxLayout()
         layout.addWidget(self.forced_window)
@@ -82,7 +82,3 @@ class SettingsTab(QWidget):
     def update_paths(self):
         self.filename_edit.setText(self.data["exe_path"])
         self.dir_name_edit.setText(self.data["track_dir"])
-
-    def save_config(self) -> None:
-        with open("data.bin", "wb") as file:
-            pickle.dump(self.data, file)

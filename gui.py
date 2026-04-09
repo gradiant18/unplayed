@@ -63,8 +63,8 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(config_widget)
 
         options_tab = self.make_options_tab()
-        banned_tracks_tab = BannedTracksTab(self.data)
-        self.settings_tab = SettingsTab(self.data)
+        banned_tracks_tab = BannedTracksTab(self)
+        self.settings_tab = SettingsTab(self)
 
         self.tabs = QTabWidget()
         self.tabs.addTab(options_tab, "Options")
@@ -251,7 +251,7 @@ class MainWindow(QMainWindow):
         self.start_button.setStyleSheet("background-color: green")
         self.start_button.clicked.connect(self.start)
 
-        self.save_button = QPushButton("Save Config")
+        self.save_button = QPushButton("Save")
         self.save_button.clicked.connect(self.save_config)
 
         main = QHBoxLayout()

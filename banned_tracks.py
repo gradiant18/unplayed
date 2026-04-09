@@ -1,3 +1,9 @@
+import csv
+import re
+import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from exchange import values
+from io import StringIO
 from PyQt6.QtWidgets import (
     QFileDialog,
     QMessageBox,
@@ -8,24 +14,18 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
 )
-import pickle
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from exchange import values
-import csv
-import re
-import requests
-from io import StringIO
 
 
 class BannedTracksTab(QWidget):
-    def __init__(self, data):
+    def __init__(self, main_window):
         super().__init__()
+        self.parent_window = main_window
         self.site_tabs = {}
-        self.data = data
+        self.data = self.parent_window.data
         self.text_input = self.make_site_tabs()
 
         save = QPushButton("Save")
-        save.clicked.connect(self.save_config)
+        save.clicked.connect(self.parent_window.save_config)
         load = QPushButton("Import")
         load.clicked.connect(self.import_banned_tracks)
         export = QPushButton("Export")
@@ -163,6 +163,7 @@ class BannedTracksTab(QWidget):
                 self.site_tabs[site].setText("")
 
     def update_banned_tracks(self) -> None:
+        self.parent_window.status.showMessage("Updating...")
         self.data["banned_tracks"] = self.get_cheated_ids()
 
         for site, tab in self.site_tabs.items():
@@ -172,6 +173,7 @@ class BannedTracksTab(QWidget):
             tab.textChanged.disconnect()
             tab.setText(site_ids)
             tab.textChanged.connect(self.banned_tracks_changed)
+        self.parent_window.status.showMessage("Updated!", 3000)
 
     def fetch_sheet_data(self, session, sheet_id, page_name, page_gid) -> tuple:
         url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&tq&gid={page_gid}"
@@ -216,7 +218,3 @@ class BannedTracksTab(QWidget):
                     cheated_ids[page_name] = ids
 
         return cheated_ids
-
-    def save_config(self) -> None:
-        with open("data.bin", "wb") as file:
-            pickle.dump(self.data, file)
