@@ -1,9 +1,13 @@
 import os
+import pickle
 import random
+import re
+import requests
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from helper import get_autosaves, get_tracks, get_uid, save_autosaves, log
+from exchange import values
 from queue import Queue, Empty, Full
 from track import Track
 from watchdog.observers import Observer
@@ -20,10 +24,11 @@ class Handler(PatternMatchingEventHandler):
 
 
 class Game:
-    def __init__(self, config):
+    def __init__(self, parent_window, config):
         self.update_config(config)
+        self.parent_window = parent_window
 
-        self.autosave_data = get_autosaves(self)
+        self.autosave_data = self.get_autosaves()
         self.autosaves = self.autosave_data["autosaves"]
         self.next = Queue(maxsize=1)
         self.observer = None
@@ -77,7 +82,7 @@ class Game:
         if self.time_limit.total_seconds() > 0:
             self.stop_time = self.start_time + self.time_limit
 
-        threading.Thread(target=get_tracks, args=(self,), daemon=True).start()
+        threading.Thread(target=self.get_tracks, daemon=True).start()
         threading.Thread(target=self.main, daemon=True).start()
 
         while not self.tracks and not self.fetching_done:
@@ -104,11 +109,11 @@ class Game:
                 and len(self.finished) >= 1
                 and len(self.finished) >= self.track_limit
             ):
-                log("[STOP] Track limit reached")
+                self.parent_window.log("[STOP] Track limit reached")
                 self.stop("Track Limit Reached")
                 break
             if self.stop_time and datetime.now() > self.stop_time:
-                log("[STOP] Time limit reached")
+                self.parent_window.log("[STOP] Time limit reached")
                 self.stop("Time Limit Reached")
                 break
 
@@ -131,7 +136,7 @@ class Game:
             self.observer = None
 
         self.autosave_data["autosaves"] = self.autosaves
-        save_autosaves(self.autosave_data)
+        self.parent_window.save_autosaves(self.autosave_data)
         self.stopped = True
 
     def skip(self) -> None:
@@ -157,8 +162,19 @@ class Game:
                 except Full:
                     continue
 
+    def get_uid(self, path):
+        for _ in range(10):
+            with open(path, "rb") as file:
+                data = file.read(4096)
+            if not data:
+                time.sleep(0.001)
+                continue
+            if match := re.search(rb'uid="(\w*)"', data):
+                return match.group(1).decode("utf-8")
+            time.sleep(0.001)
+
     def update_session(self, replay_path) -> None:
-        replay_uid = get_uid(replay_path)
+        replay_uid = self.get_uid(replay_path)
         if not hasattr(self, "current") or self.current.uid != replay_uid:
             # different track played
             return
@@ -177,9 +193,9 @@ class Game:
 
         self.autosaves.add(replay_uid)
         self.finished.update({self.current.uid: self.current.medal})
-        log(f"[FINISHED] {self.finished}")
+        self.parent_window.log(f"[FINISHED] {self.finished}")
         self.autosave_data["autosaves"] = self.autosaves
-        save_autosaves(self.autosave_data)
+        self.parent_window.save_autosaves(self.autosave_data)
         if len(self.tracks) >= 0 and not self.stop_session:
             self.go_next = True
 
@@ -202,3 +218,112 @@ class Game:
             return self.current
         except AttributeError:
             return None
+
+    def load(self):
+        if not os.path.exists("autosaves.bin"):
+            return {"oldest": 0, "autosaves": None}
+        with open("autosaves.bin", "rb") as file:
+            data = pickle.load(file)
+        if not data:
+            data = {"oldest": 0, "autosaves": None}
+        return data
+
+    def get_autosaves(self):
+        data = self.load()
+        files = []
+        oldest = data["oldest"]
+
+        for entry in os.scandir(self.autosave_dir):
+            if not entry.is_file():
+                continue
+            if (old := os.path.getmtime(entry)) <= data["oldest"]:
+                continue
+
+            files.append(entry.path)
+            if old > oldest:
+                oldest = old
+        data["oldest"] = oldest
+
+        with ThreadPoolExecutor(max_workers=10) as exe:
+            autosaves = set(exe.map(self.get_uid, files))
+
+        if not data.get("autosaves"):
+            data["autosaves"] = autosaves
+        else:
+            data["autosaves"].update(autosaves)
+        return data
+
+    def get_tracks(self):
+        api_url = f"https://{values[self.site]['url']}/api/tracks?"
+        params = {
+            "fields": "TrackId,TrackName,UId,AuthorTime,GoldTarget,SilverTarget,BronzeTarget,WRReplay.ReplayTime",
+            "count": 1000,
+        }
+
+        for param, value in self.config.get("track_rules", {}).items():
+            if value is not None:
+                params[param] = value
+
+        banned_set = set(self.banned_tracks)
+        autosaves_set = self.autosaves
+        current_last = 0
+
+        with requests.Session() as http:
+            retries = 0
+            while not self.stop_session and retries < 5:
+                try:
+                    params["after"] = current_last
+                    response = http.get(api_url, params=params, timeout=10)
+
+                    response.raise_for_status()
+
+                    data = response.json()
+                    results = data.get("Results", [])
+
+                    if not results:
+                        break
+
+                    valid_tracks = [
+                        Track(track)
+                        for track in results
+                        if track["UId"] not in autosaves_set
+                        and track["TrackId"] not in banned_set
+                    ]
+
+                    if valid_tracks:
+                        self.tracks.extend(valid_tracks)
+
+                    current_last = results[-1]["TrackId"]
+
+                    if not data.get("More", False):
+                        break
+                    self.parent_window.log(
+                        f"[API] Getting more tracks, total so far = {len(self.tracks)}"
+                    )
+
+                except requests.exceptions.RequestException as e:
+                    self.parent_window.log(f"[API] Error fetching tracks: {e}")
+                    retries += 1
+                    time.sleep(1)
+                    continue
+
+        self.fetching_done = True
+        original_limit = self.config["game_rules"]["track_limit"]
+        if not original_limit or self.track_limit > len(self.tracks):
+            self.track_limit = len(self.tracks)
+        self.detect_uid_clash()
+
+    def detect_uid_clash(self):
+        processed_uids = {}
+        for track in self.tracks:
+            if track.wr:
+                processed_uids[track.uid] = track.track_id
+                continue
+
+            if track.uid in processed_uids:
+                self.parent_window.log(
+                    f"[UID] Clash for {track.track_id} and {processed_uids[track.uid]}"
+                )
+            else:
+                processed_uids[track.uid] = track.track_id
+        return processed_uids

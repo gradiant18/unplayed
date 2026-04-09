@@ -1,14 +1,12 @@
 import copy
 import os
 import pickle
-import sys
 import time
 from banned_tracks import BannedTracksTab
 from datetime import datetime, timedelta
 from exchange import values
 from find_paths import FindExe, FindTracks
 from game import Game
-from helper import log
 from settings import SettingsTab
 from PyQt6.QtCore import QDateTime, QTime, QTimer, Qt
 from PyQt6.QtWidgets import (
@@ -52,8 +50,11 @@ class MainWindow(QMainWindow):
             self.setMinimumSize(self.minimumSizeHint())
             self.setMaximumSize(self.minimumSizeHint())
 
-        self.data["debug"] = len(sys.argv) == 2
-        self.session = Game(self.create_config())
+        default = self.data["default_data"]
+        self.session = Game(self, self.create_config())
+        if default:
+            self.data["default_data"] = False
+            self.save_config()
 
         self.progress_timer = QTimer(self)
         self.progress_timer.timeout.connect(self.update_progress)
@@ -411,7 +412,7 @@ class MainWindow(QMainWindow):
         if param is not None:
             param.setEnabled(state == 2)
         if key == "unlimiterver":
-            log(f"check_changed, {state = }")
+            self.log(f"check_changed, {state = }")
             if state == 2:
                 self.data["track_rules"]["inunlimiter"]["state"] = 2
                 self.data["track_rules"]["inunlimiter"]["value"] = 1
@@ -592,11 +593,22 @@ class MainWindow(QMainWindow):
             self.data["track_rules"][key]["text"] = values[site][key][track_rule]
 
         self.data["track_rules"][key]["value"] = track_rule
-        log(f"[OPTION] {key} changed to {track_rule}")
+        self.log(f"[OPTION] {key} changed to {track_rule}")
         self.update_session_config()
+
+    def log(self, thing):
+        now = time.time()
+        with open(os.path.join(self.data["app_dir"], "log.log"), "a") as file:
+            file.write(f"[{now}] {thing}\n")
+
+    def save_autosaves(self, autosave_data):
+        with open(os.path.join(self.data["app_dir"], "autosaves.bin"), "wb") as file:
+            pickle.dump(autosave_data, file)
 
     def save_config(self) -> None:
         self.status.showMessage("Saving...")
-        with open("data.bin", "wb") as file:
+        self.save_autosaves(self.data)
+        data_path = os.path.join(self.data["app_dir"], "data.bin")
+        with open(data_path, "wb") as file:
             pickle.dump(self.data, file)
         self.status.showMessage("Saved!", 3000)
