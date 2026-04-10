@@ -28,7 +28,7 @@ class Game:
         self.update_config(config)
         self.parent_window = parent_window
 
-        self.autosave_data = self.get_autosaves()
+        self.autosave_data = self.update_autosaves()
         self.autosaves = self.autosave_data["autosaves"]
         self.next = Queue(maxsize=1)
         self.observer = None
@@ -120,7 +120,8 @@ class Game:
             if self.go_next:
                 try:
                     self.current = self.next.get(timeout=0.5)
-                    self.current.load(self.config["exe_path"], self.config["debug"])
+                    if not self.config["no_launch"]:
+                        self.current.load(self.config["exe_path"])
                     self.go_next = False
                 except Empty:
                     pass
@@ -222,39 +223,43 @@ class Game:
         except AttributeError:
             return None
 
-    def load(self):
-        if not os.path.exists("autosaves.bin"):
+    def load_autosaves(self):
+        path = os.path.join(self.config["app_dir"], "autosaves.bin")
+        if not os.path.exists(path):
             return {"oldest": 0, "autosaves": None}
-        with open("autosaves.bin", "rb") as file:
+        with open(path, "rb") as file:
             data = pickle.load(file)
         if not data:
             data = {"oldest": 0, "autosaves": None}
         return data
 
-    def get_autosaves(self):
-        data = self.load()
+    def update_autosaves(self):
+        autosave_data = self.load_autosaves()
         files = []
-        oldest = data["oldest"]
+        oldest = autosave_data.get("oldest", None)
+        if not oldest:
+            oldest = 0
+            autosave_data["oldest"] = 0
 
         for entry in os.scandir(self.autosave_dir):
             if not entry.is_file():
                 continue
-            if (old := os.path.getmtime(entry)) <= data["oldest"]:
+            if (old := os.path.getmtime(entry)) <= autosave_data["oldest"]:
                 continue
 
             files.append(entry.path)
             if old > oldest:
                 oldest = old
-        data["oldest"] = oldest
+        autosave_data["oldest"] = oldest
 
         with ThreadPoolExecutor(max_workers=10) as exe:
             autosaves = set(exe.map(self.get_uid, files))
 
-        if not data.get("autosaves"):
-            data["autosaves"] = autosaves
+        if not autosave_data.get("autosaves"):
+            autosave_data["autosaves"] = autosaves
         else:
-            data["autosaves"].update(autosaves)
-        return data
+            autosave_data["autosaves"].update(autosaves)
+        return autosave_data
 
     def get_tracks(self):
         api_url = f"https://{values[self.site]['url']}/api/tracks?"

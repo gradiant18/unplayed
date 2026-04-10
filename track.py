@@ -42,8 +42,7 @@ class Track:
                 break
         return replay_time
 
-    # TODO: make not os/program dependent
-    def load(self, exe_path, debug):
+    def load(self, exe_path) -> None:
         if platform.system() == "Windows":
             command = [
                 exe_path,
@@ -61,16 +60,14 @@ class Track:
                 "/useexedir",
                 f"/file={self.path}",
             ]
-
-        if not debug:
-            subprocess.run(command)
+        subprocess.run(command)
 
     def download(self, track_dir, site):
         # check dir path
-        randomizer_path = os.path.join(track_dir, "Challenges", "Randomizer")
-        if not os.path.exists(randomizer_path):
-            os.mkdir(randomizer_path)
-        dir_path = os.path.join(randomizer_path, site)
+        unplayed_path = os.path.join(track_dir, "Challenges", "Unplayed")
+        if not os.path.exists(unplayed_path):
+            os.mkdir(unplayed_path)
+        dir_path = os.path.join(unplayed_path, site)
         if not os.path.exists(dir_path):
             os.mkdir(dir_path)
 
@@ -79,7 +76,6 @@ class Track:
         if os.path.exists(self.path):
             return
 
-        # get download url
         download_url = f"https://{values[site]['url']}/trackgbx/{self.track_id}"
 
         retries = 0
@@ -94,8 +90,7 @@ class Track:
                     print(track_response.status_code)
                 retries += 1
                 time.sleep(1)
-            except requests.RequestException as e:
-                # print(f"Retry {retries + 1}/3 failed: {e}")
+            except requests.RequestException:
                 retries += 1
                 time.sleep(1)
         return

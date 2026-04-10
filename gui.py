@@ -434,6 +434,7 @@ class MainWindow(QMainWindow):
             self.data["track_rules"][key]["state"] = state
         else:
             self.data["game_rules"][key]["state"] = state
+        self.log(f"[OPTION] {key} changed to {state}")
         self.update_session_config()
 
     def create_config(self) -> dict:
@@ -477,13 +478,13 @@ class MainWindow(QMainWindow):
             config["game_rules"]["time_limit"] = timedelta()
             self.time_frame.hide()
 
-        config["sorted"] = self.data["track_rules"]["order1"]["state"]
-
         for rule in self.data["track_rules"]:
             if self.data["track_rules"][rule]["state"]:
                 config["track_rules"][rule] = self.data["track_rules"][rule]["value"]
             else:
                 config["track_rules"][rule] = None
+        config["sorted"] = self.data["track_rules"]["order1"]["state"]
+        config["app_dir"] = self.data["app_dir"]
         return config
 
     def update_session_config(self) -> None:
@@ -608,7 +609,7 @@ class MainWindow(QMainWindow):
 
     def save_config(self) -> None:
         self.status.showMessage("Saving...")
-        self.save_autosaves(self.data)
+        self.save_autosaves(self.session.load_autosaves())
         data_path = os.path.join(self.data["app_dir"], "data.bin")
         with open(data_path, "wb") as file:
             pickle.dump(self.data, file)

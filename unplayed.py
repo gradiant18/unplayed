@@ -1,3 +1,4 @@
+import argparse
 import os
 import pickle
 import platform
@@ -6,14 +7,25 @@ from default_data import default_data
 from gui import MainWindow
 from PyQt6.QtWidgets import QApplication
 
-if platform.system() == "Windows":
-    app_dir = os.path.join(str(os.getenv("APPDATA")), "unplayed")
-    if not os.path.exists(app_dir):
-        os.mkdir(app_dir)
-elif platform.system() == "Linux":
-    app_dir = os.path.expanduser("~/.unplayed")
-    if not os.path.exists(app_dir):
-        os.mkdir(app_dir)
+parser = argparse.ArgumentParser(description="Play random tracks in TMNF/TMUF")
+parser.add_argument(
+    "-n", "--nolaunch", action="store_true", help="Don't launch tracks in game"
+)
+parser.add_argument("-s", "--savehere", action="store_true", help="Save files here")
+
+args = parser.parse_args()
+
+if not args.savehere:
+    if platform.system() == "Windows":
+        app_dir = os.path.join(str(os.getenv("APPDATA")), "unplayed")
+        if not os.path.exists(app_dir):
+            os.mkdir(app_dir)
+    elif platform.system() == "Linux":
+        app_dir = os.path.expanduser("~/.unplayed")
+        if not os.path.exists(app_dir):
+            os.mkdir(app_dir)
+    else:
+        app_dir = ""
 else:
     app_dir = ""
 
@@ -30,7 +42,7 @@ else:
     data = default_data
 
 data["app_dir"] = app_dir
-data["debug"] = len(sys.argv) == 2
+data["no_launch"] = args.nolaunch
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

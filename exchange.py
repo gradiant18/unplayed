@@ -51,10 +51,6 @@ values = {
             "Track Length (Longest)",
             "World record time (Shortest)",
             "World record time (Longest)",
-            "",
-            "",
-            "",
-            "",
         ],
     },
     "TMUF-X": {
