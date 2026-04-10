@@ -5,10 +5,14 @@ unplayed is a simple utility to play random tracks for TMNF/TMUF
 
 ## Setup
 
-The first time the program is run, there will be 2 pop-ups asking for path to the trackmania exe, and where the tracks are stored.  
-Currently only checks for Steam install locations.
+The first time the program is run, there will be 2 pop-ups.  
+First, location of the trackmania exe.  
 ![find exe screen](/assets/find_exe.png)
+
+Then, location where the tracks are stored.
 ![find tracks screen](/assets/find_tracks.png)
+
+Currently only checks for Steam install locations.
 
 ## Options
 
@@ -36,6 +40,7 @@ Currently only checks for Steam install locations.
 ## Banned tracks
 
 ![banned tracks screen](/assets/banned_tracks.png)
+
 Will not play any tracks with track id as specified in each site tab.
 
 | Name   | Description                                                                                                                                                         |
@@ -47,7 +52,7 @@ Will not play any tracks with track id as specified in each site tab.
 
 ## Settings
 
-![settings screen](/assets/settinsg.png)
+![settings screen](/assets/settings.png)
 
 | Name                      | Description                                            |
 | ------------------------- | ------------------------------------------------------ |

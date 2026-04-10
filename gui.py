@@ -33,7 +33,7 @@ from PyQt6.QtWidgets import (
 class MainWindow(QMainWindow):
     def __init__(self, data) -> None:
         super().__init__()
-        self.setWindowTitle("Randomizer")
+        self.setWindowTitle("Unplayed")
         self.status = QStatusBar()
         self.setStatusBar(self.status)
 
@@ -491,7 +491,6 @@ class MainWindow(QMainWindow):
             self.session.update_config(self.create_config())
 
     def start(self) -> None:
-        self.setWindowTitle("Randomizer")
         self.start_button.setEnabled(False)
 
         self.session.update_config(self.create_config())
