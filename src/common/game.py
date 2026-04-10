@@ -5,11 +5,11 @@ import re
 import requests
 import threading
 import time
+from common.exchange import values
+from common.track import Track
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from exchange import values
 from queue import Queue, Empty, Full
-from track import Track
 from watchdog.observers import Observer
 from watchdog.events import PatternMatchingEventHandler
 

@@ -1,8 +1,8 @@
 import csv
 import re
 import requests
+from common.exchange import values
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from exchange import values
 from io import StringIO
 from PyQt6.QtWidgets import (
     QFileDialog,

@@ -1,7 +1,8 @@
-__pycache__/*
-venv*/*
-build/*
-dist/*
+__pycache__/
+venv*/
+bin/
+build/
+dist/
 unplayed/*
 *.yaml
 *.yml

@@ -1,10 +1,10 @@
 import os
 import platform
 import re
-from exchange import values
 import requests
 import subprocess
 import time
+from common.exchange import values
 
 
 class Track:

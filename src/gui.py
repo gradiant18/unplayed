@@ -3,10 +3,10 @@ import os
 import pickle
 import time
 from banned_tracks import BannedTracksTab
+from common.exchange import values
+from common.game import Game
 from datetime import datetime, timedelta
-from exchange import values
 from find_paths import FindExe, FindTracks
-from game import Game
 from settings import SettingsTab
 from PyQt6.QtCore import QDateTime, QTime, QTimer, Qt
 from PyQt6.QtWidgets import (
