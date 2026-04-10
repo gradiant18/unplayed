@@ -145,7 +145,7 @@ class Game:
 
     def reload(self) -> None:
         time.sleep(0.5)
-        self.current.load(self.config["exe_path"], self.config["debug"])
+        self.current.load(self.config["exe_path"])
 
     def downloader(self) -> None:
         while len(self.tracks) > 0 and not self.stop_session:

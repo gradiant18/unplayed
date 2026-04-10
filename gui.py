@@ -604,12 +604,18 @@ class MainWindow(QMainWindow):
             file.write(f"[{now}] {thing}\n")
 
     def save_autosaves(self, autosave_data):
+        if not autosave_data:
+            return
         with open(os.path.join(self.data["app_dir"], "autosaves.bin"), "wb") as file:
             pickle.dump(autosave_data, file)
 
     def save_config(self) -> None:
         self.status.showMessage("Saving...")
+        if self.data["app_dir"] != "" and not os.path.exists(self.data["app_dir"]):
+            os.mkdir(self.data["app_dir"])
+
         self.save_autosaves(self.session.load_autosaves())
+
         data_path = os.path.join(self.data["app_dir"], "data.bin")
         with open(data_path, "wb") as file:
             pickle.dump(self.data, file)

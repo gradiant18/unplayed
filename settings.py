@@ -1,3 +1,4 @@
+import shutil
 from PyQt6.QtWidgets import (
     QCheckBox,
     QFileDialog,
@@ -13,8 +14,8 @@ from PyQt6.QtWidgets import (
 class SettingsTab(QWidget):
     def __init__(self, main_window):
         super().__init__()
-        self.parent = main_window
-        self.data = self.parent.data
+        self.parent_window = main_window
+        self.data = self.parent_window.data
         # force window size true/false
         self.forced_window = QCheckBox("Force Window Size (Requires Restart)")
         self.forced_window.setChecked(self.data["force_window_size"])
@@ -46,14 +47,19 @@ class SettingsTab(QWidget):
         exe.addWidget(self.dir_name_edit, 1, 1)
         exe.addWidget(dir_browse, 1, 2)
 
+        # delete data
+        delete_button = QPushButton("Delete all data")
+        delete_button.clicked.connect(self.delete_data)
+
         # save
         save = QPushButton("Save")
-        save.clicked.connect(self.parent.save_config)
+        save.clicked.connect(self.parent_window.save_config)
 
         layout = QVBoxLayout()
         layout.addWidget(self.forced_window)
         layout.addWidget(self.auto_update)
         layout.addLayout(exe)
+        layout.addWidget(delete_button)
         layout.addWidget(save)
         self.setLayout(layout)
 
@@ -82,3 +88,7 @@ class SettingsTab(QWidget):
     def update_paths(self):
         self.filename_edit.setText(self.data["exe_path"])
         self.dir_name_edit.setText(self.data["track_dir"])
+
+    def delete_data(self):
+        data_path = self.data["app_dir"]
+        shutil.rmtree(data_path)
