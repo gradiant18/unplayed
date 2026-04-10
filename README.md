@@ -1,10 +1,8 @@
-# Unplayed
-
-## Overview
+# Overview
 
 unplayed is a simple utility to play random tracks for TMNF/TMUF
 
-### Options
+## Options
 
 | Name            | Description                                                |
 | --------------- | ---------------------------------------------------------- |
@@ -25,7 +23,7 @@ unplayed is a simple utility to play random tracks for TMNF/TMUF
 | Unlimiter       | Only play tracks with specific unlimiter version (eg. 2.0) |
 | Sort Order      | Play tracks in this order (eg. Track Length (Shortest))    |
 
-### Banned tracks
+## Banned tracks
 
 Will not play any tracks with track id as specified in each site tab.
 
@@ -36,7 +34,7 @@ Will not play any tracks with track id as specified in each site tab.
 | Clear  | Clears all banned tracks from all sites                                                                                                                             |
 | Update | Sets all banned tracks to the same as from the [Cheated Map List](https://docs.google.com/spreadsheets/d/1fqmzFGPIFBlJuxlwnPJSh1nCTTxqWXtHtvP5OUxE4Ow/) spreadsheet |
 
-### Settings
+## Settings
 
 | Name                      | Description                                            |
 | ------------------------- | ------------------------------------------------------ |
