@@ -1,8 +1,18 @@
 # Overview
 
 unplayed is a simple utility to play random tracks for TMNF/TMUF
+![game screen](/assets/game.png)
+
+## Setup
+
+The first time the program is run, there will be 2 pop-ups asking for path to the trackmania exe, and where the tracks are stored.  
+Currently only checks for Steam install locations.
+![find exe screen](/assets/find_exe.png)
+![find tracks screen](/assets/find_tracks.png)
 
 ## Options
+
+![options screen](/assets/options.png)
 
 | Name            | Description                                                |
 | --------------- | ---------------------------------------------------------- |
@@ -25,6 +35,7 @@ unplayed is a simple utility to play random tracks for TMNF/TMUF
 
 ## Banned tracks
 
+![banned tracks screen](/assets/banned_tracks.png)
 Will not play any tracks with track id as specified in each site tab.
 
 | Name   | Description                                                                                                                                                         |
@@ -35,6 +46,8 @@ Will not play any tracks with track id as specified in each site tab.
 | Update | Sets all banned tracks to the same as from the [Cheated Map List](https://docs.google.com/spreadsheets/d/1fqmzFGPIFBlJuxlwnPJSh1nCTTxqWXtHtvP5OUxE4Ow/) spreadsheet |
 
 ## Settings
+
+![settings screen](/assets/settinsg.png)
 
 | Name                      | Description                                            |
 | ------------------------- | ------------------------------------------------------ |
