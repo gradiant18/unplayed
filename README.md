@@ -58,3 +58,4 @@ Will not play any tracks with track id as specified in each site tab.
 | ------------------------- | ------------------------------------------------------ |
 | Force Window Size         | Forces the window size so it can't be resized          |
 | Auto Update Banned Tracks | At startup, update banned tracks from Cheated Map List |
+| Delete all data           | Deletes all saved data. (Doesn't change UI)            |
