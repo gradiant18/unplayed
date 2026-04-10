@@ -44,6 +44,7 @@ default_data = {
         "difficulty": {"state": 0, "value": 0, "text": "Beginner"},
         "inhasrecord": {"state": 2, "value": 0, "text": "No Records"},
         "inauthortimebeaten": {"state": 0, "value": 0, "text": "Not Beaten"},
+        "order1": {"state": 0, "value": 39, "text": "Track Length (Shortest)"},
     },
     "banned_tracks": {
         "TMUF-X": set(),

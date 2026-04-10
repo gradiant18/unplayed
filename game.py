@@ -148,8 +148,11 @@ class Game:
 
     def downloader(self) -> None:
         while len(self.tracks) > 0 and not self.stop_session:
-            track = random.choice(self.tracks)
-            self.tracks.remove(track)
+            if self.config["sorted"] == 2:
+                track = self.tracks.pop(0)
+            else:
+                track = random.choice(self.tracks)
+                self.tracks.remove(track)
 
             if track.uid in self.autosaves:
                 continue

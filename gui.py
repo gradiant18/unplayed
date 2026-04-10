@@ -248,6 +248,12 @@ class MainWindow(QMainWindow):
         unlimiter.addWidget(self.inunlimeter_check)
         unlimiter.addWidget(self.unlimiterver)
 
+        self.order1 = self.make_combobox("order1")
+        self.order_check = self.make_checkbox("Sort Order", "order1")
+        order = QVBoxLayout()
+        order.addWidget(self.order_check)
+        order.addWidget(self.order1)
+
         self.start_button = QPushButton("Start")
         self.start_button.setStyleSheet("background-color: green")
         self.start_button.clicked.connect(self.start)
@@ -286,6 +292,7 @@ class MainWindow(QMainWindow):
         layout.addLayout(main3)
         layout.addLayout(main4)
         layout.addLayout(main5)
+        layout.addLayout(order)
         layout.addWidget(self.start_button)
         layout.addWidget(self.save_button)
         tab = QWidget()
@@ -470,6 +477,8 @@ class MainWindow(QMainWindow):
             config["game_rules"]["time_limit"] = timedelta()
             self.time_frame.hide()
 
+        config["sorted"] = self.data["track_rules"]["order1"]["state"]
+
         for rule in self.data["track_rules"]:
             if self.data["track_rules"][rule]["state"]:
                 config["track_rules"][rule] = self.data["track_rules"][rule]["value"]
@@ -581,14 +590,7 @@ class MainWindow(QMainWindow):
                 self.data["track_rules"]["unlimiterver"]["state"] = 0
             else:
                 self.data["track_rules"]["unlimiterver"]["state"] = 2
-        elif key in [
-            "difficulty",
-            "environment",
-            "inhasrecord",
-            "mood",
-            "primarytype",
-            "tag",
-        ]:
+        else:
             track_rule = values[site][key].index(value)
             self.data["track_rules"][key]["text"] = values[site][key][track_rule]
 
