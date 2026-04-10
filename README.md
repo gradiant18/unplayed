@@ -1,6 +1,6 @@
 # Overview
 
-unplayed is a simple utility to play random tracks for TMNF/TMUF
+unplayed is a simple utility to play random tracks for TMNF/TMUF  
 ![game screen](/assets/game.png)
 
 ## Setup
