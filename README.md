@@ -3,6 +3,10 @@
 unplayed is a simple utility to play random tracks for TMNF/TMUF  
 ![game screen](/assets/game.png)
 
+## Requirements
+- TMNF/TMUF installed with Steam
+- [protontricks](https://github.com/Matoking/protontricks)
+
 ## Setup
 
 The first time the program is run, there will be 2 pop-ups.  
