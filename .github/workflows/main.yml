@@ -28,7 +28,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Build executable
-        run: pyinstaller --onefile --noconsole src/main.py
+        run: pyinstaller --name "unplayed" --onefile --noconsole src/main.py
 
       - name: Rename executable
         run: |
