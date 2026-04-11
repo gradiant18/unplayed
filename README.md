@@ -5,7 +5,7 @@ unplayed is a simple utility to play random tracks for TMNF/TMUF
 
 ## Requirements
 - TMNF/TMUF installed with Steam
-- [protontricks](https://github.com/Matoking/protontricks)
+- [protontricks](https://github.com/Matoking/protontricks) (if on Linux)
 
 ## Setup
 
