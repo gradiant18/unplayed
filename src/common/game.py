@@ -55,6 +55,8 @@ class Game:
         )
 
     def start(self) -> None:
+        self.autosave_data = self.update_autosaves()
+        self.autosaves = self.autosave_data["autosaves"]
         self.next = Queue(maxsize=1)
         self.tracks = []
         self.finished = {}
