@@ -33,6 +33,7 @@ class Game:
         self.next = Queue(maxsize=1)
         self.observer = None
 
+        self.skipped = set()
         self.tracks = []
         self.finished = {}
 
@@ -76,11 +77,12 @@ class Game:
         self.site = self.config["game_rules"].get("site", "TMNF-X")
         self.track_rules = self.config.get("track_rules")
         self.banned_tracks = (
-            self.config["banned_tracks"][self.site]
+            set(self.config["banned_tracks"][self.site])
             if self.config.get("banned_tracks")
             and self.config["banned_tracks"].get(self.site)
-            else []
+            else set()
         )
+        self.skipped = self.get_skipped_tracks()
         if self.time_limit.total_seconds() > 0:
             self.stop_time = self.start_time + self.time_limit
 
@@ -140,9 +142,12 @@ class Game:
 
         self.autosave_data["autosaves"] = self.autosaves
         self.parent_window.save_autosaves(self.autosave_data)
+        self.parent_window.save_skipped(self.skipped)
         self.stopped = True
 
     def skip(self) -> None:
+        if self.config.get("skip_skipped"):
+            self.skipped.add(self.current.track_id)
         self.go_next = True
 
     def reload(self) -> None:
@@ -225,7 +230,21 @@ class Game:
         except AttributeError:
             return None
 
-    def load_autosaves(self):
+    def get_skipped_tracks(self) -> set:
+        if not hasattr(self, "site"):
+            return set()
+        path = os.path.join(self.config["app_dir"], f"{self.site}_skipped.txt")
+        if not os.path.exists(path):
+            return set()
+        with open(path) as file:
+            data = file.read()
+        pattern = re.compile(r"\d+")
+        matches = list(pattern.finditer(data))
+        if not matches:
+            return set()
+        return {int(x.group(0)) for x in matches}
+
+    def get_autosaves(self):
         path = os.path.join(self.config["app_dir"], "autosaves.bin")
         if not os.path.exists(path):
             return {"oldest": 0, "autosaves": None}
@@ -236,7 +255,7 @@ class Game:
         return data
 
     def update_autosaves(self):
-        autosave_data = self.load_autosaves()
+        autosave_data = self.get_autosaves()
         files = []
         oldest = autosave_data.get("oldest", None)
         if not oldest:
@@ -274,8 +293,6 @@ class Game:
             if value is not None:
                 params[param] = value
 
-        banned_set = set(self.banned_tracks)
-        autosaves_set = self.autosaves
         current_last = 0
 
         with requests.Session() as http:
@@ -293,12 +310,21 @@ class Game:
                     if not results:
                         break
 
-                    valid_tracks = [
-                        Track(track)
-                        for track in results
-                        if track["UId"] not in autosaves_set
-                        and track["TrackId"] not in banned_set
-                    ]
+                    if self.config.get("skip_skipped", False):
+                        valid_tracks = [
+                            Track(track)
+                            for track in results
+                            if track["UId"] not in self.autosaves
+                            and track["TrackId"] not in self.banned_tracks
+                            and track["TrackId"] not in self.skipped
+                        ]
+                    else:
+                        valid_tracks = [
+                            Track(track)
+                            for track in results
+                            if track["UId"] not in self.autosaves
+                            and track["TrackId"] not in self.banned_tracks
+                        ]
 
                     if valid_tracks:
                         self.tracks.extend(valid_tracks)

@@ -16,6 +16,7 @@ class SettingsTab(QWidget):
         super().__init__()
         self.parent_window = main_window
         self.data = self.parent_window.data
+
         # force window size true/false
         self.forced_window = QCheckBox("Force Window Size (Requires Restart)")
         self.forced_window.setChecked(self.data["force_window_size"])
@@ -25,6 +26,11 @@ class SettingsTab(QWidget):
         self.auto_update = QCheckBox("Auto Update Banned Tracks")
         self.auto_update.setChecked(self.data["auto_update"])
         self.auto_update.stateChanged.connect(lambda state: self.change_update(state))
+
+        # don't play skipped tracks
+        self.skip_skipped = QCheckBox("Don't Play Skipped Tracks")
+        self.skip_skipped.setChecked(self.data.get("skip_skipped", False))
+        self.skip_skipped.stateChanged.connect(lambda state: self.change_skip(state))
 
         # exe path
         file_browse = QPushButton("Browse")
@@ -58,6 +64,7 @@ class SettingsTab(QWidget):
         layout = QVBoxLayout()
         layout.addWidget(self.forced_window)
         layout.addWidget(self.auto_update)
+        layout.addWidget(self.skip_skipped)
         layout.addLayout(exe)
         layout.addWidget(delete_button)
         layout.addWidget(save)
@@ -68,6 +75,9 @@ class SettingsTab(QWidget):
 
     def change_update(self, state):
         self.data["auto_update"] = state == 2
+
+    def change_skip(self, state):
+        self.data["skip_skipped"] = state == 2
 
     def open_file_dialog(self):
         filename = QFileDialog.getOpenFileName(self, "Select TMUF/TMNF Exe")[0]

@@ -3,10 +3,11 @@ venv*/
 bin/
 build/
 dist/
-unplayed/*
+unplayed/
 *.yaml
 *.yml
 *.bin
 *.log
 *.bin
 *.spec
+*.txt

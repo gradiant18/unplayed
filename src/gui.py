@@ -606,15 +606,35 @@ class MainWindow(QMainWindow):
     def save_autosaves(self, autosave_data):
         if not autosave_data:
             return
+
+        if self.data["app_dir"] != "" and not os.path.exists(self.data["app_dir"]):
+            os.mkdir(self.data["app_dir"])
         with open(os.path.join(self.data["app_dir"], "autosaves.bin"), "wb") as file:
             pickle.dump(autosave_data, file)
+
+    def save_skipped(self, skipped) -> None:
+        if not skipped:
+            return
+        if not hasattr(self.session, "site"):
+            return
+        else:
+            site = self.session.site
+
+        if self.data["app_dir"] != "" and not os.path.exists(self.data["app_dir"]):
+            os.mkdir(self.data["app_dir"])
+        with open(
+            os.path.join(self.data["app_dir"], f"{site}_skipped.txt"), "w"
+        ) as file:
+            for track_id in skipped:
+                file.write(f"https://{values[site]['url']}/trackshow/{track_id}\n")
 
     def save_config(self) -> None:
         self.status.showMessage("Saving...")
         if self.data["app_dir"] != "" and not os.path.exists(self.data["app_dir"]):
             os.mkdir(self.data["app_dir"])
 
-        self.save_autosaves(self.session.load_autosaves())
+        self.save_autosaves(self.session.get_autosaves())
+        self.save_skipped(self.session.skipped)
 
         data_path = os.path.join(self.data["app_dir"], "data.bin")
         with open(data_path, "wb") as file:
