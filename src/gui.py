@@ -630,7 +630,7 @@ class MainWindow(QMainWindow):
         if self.data["app_dir"] != "" and not os.path.exists(self.data["app_dir"]):
             os.mkdir(self.data["app_dir"])
 
-        self.save_autosaves(self.session.save_autosaves())
+        self.save_autosaves(self.session.get_autosaves())
         self.save_skipped(self.session.skipped)
 
         data_path = os.path.join(self.data["app_dir"], "data.bin")

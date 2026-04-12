@@ -243,7 +243,7 @@ class Game:
             return set()
         return {int(x.group(0)) for x in matches}
 
-    def save_autosaves(self):
+    def get_autosaves(self):
         path = os.path.join(self.config["app_dir"], "autosaves.bin")
         if not os.path.exists(path):
             return {"oldest": 0, "autosaves": None}
@@ -254,7 +254,7 @@ class Game:
         return data
 
     def update_autosaves(self):
-        autosave_data = self.save_autosaves()
+        autosave_data = self.get_autosaves()
         files = []
         oldest = autosave_data.get("oldest", None)
         if not oldest:
