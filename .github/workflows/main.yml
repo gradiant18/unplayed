@@ -33,9 +33,9 @@ jobs:
       - name: Rename executable
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            mv dist/main.exe dist/unplayed-windows-${{ github.event.inputs.version }}.exe
+            mv dist/unplayed.exe dist/unplayed-windows-${{ github.event.inputs.version }}.exe
           elif [[ "$RUNNER_OS" == "Linux" ]]; then
-            mv dist/main dist/unplayed-linux-${{ github.event.inputs.version }}
+            mv dist/unplayed dist/unplayed-linux-${{ github.event.inputs.version }}
           fi
         shell: bash
 
