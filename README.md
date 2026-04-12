@@ -4,6 +4,7 @@ unplayed is a simple utility to play random tracks for TMNF/TMUF
 ![game screen](/assets/game.png)
 
 ## Requirements
+
 - TMNF/TMUF installed with Steam
 - [protontricks](https://github.com/Matoking/protontricks) (if on Linux)
 
@@ -15,8 +16,6 @@ First, location of the trackmania exe.
 
 Then, location where the tracks are stored.
 ![find tracks screen](/assets/find_tracks.png)
-
-Currently only checks for Steam install locations.
 
 ## Options
 
@@ -62,4 +61,5 @@ Will not play any tracks with track id as specified in each site tab.
 | ------------------------- | ------------------------------------------------------ |
 | Force Window Size         | Forces the window size so it can't be resized          |
 | Auto Update Banned Tracks | At startup, update banned tracks from Cheated Map List |
-| Delete all data           | Deletes all saved data. (Doesn't change UI)            |
+| Don't Play Skipped Tracks | Saves skipped tracks to file and won't play them again |
+| Delete all data           | Deletes all saved data (Doesn't change UI)             |
