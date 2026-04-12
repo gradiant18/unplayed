@@ -142,6 +142,7 @@ class Game:
 
         self.autosave_data["autosaves"] = self.autosaves
         self.parent_window.save_autosaves(self.autosave_data)
+        self.parent_window.save_skipped(self.skipped)
         self.stopped = True
 
     def skip(self) -> None:

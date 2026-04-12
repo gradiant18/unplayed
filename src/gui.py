@@ -604,10 +604,11 @@ class MainWindow(QMainWindow):
             file.write(f"[{now}] {thing}\n")
 
     def save_autosaves(self, autosave_data):
-        if self.data["app_dir"] != "" and not os.path.exists(self.data["app_dir"]):
-            os.mkdir(self.data["app_dir"])
         if not autosave_data:
             return
+
+        if self.data["app_dir"] != "" and not os.path.exists(self.data["app_dir"]):
+            os.mkdir(self.data["app_dir"])
         with open(os.path.join(self.data["app_dir"], "autosaves.bin"), "wb") as file:
             pickle.dump(autosave_data, file)
 
@@ -619,6 +620,8 @@ class MainWindow(QMainWindow):
         else:
             site = self.session.site
 
+        if self.data["app_dir"] != "" and not os.path.exists(self.data["app_dir"]):
+            os.mkdir(self.data["app_dir"])
         with open(
             os.path.join(self.data["app_dir"], f"{site}_skipped.txt"), "w"
         ) as file:
