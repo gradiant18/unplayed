@@ -9,6 +9,7 @@ default_data = {
     "auto_update": False,
     "default_data": True,
     "app_dir": "",
+    "skip_skipped": True,
     "game_rules": {
         "next_mode": "finished",
         "track_limit": {"state": 0, "value": 0},
