@@ -7,6 +7,7 @@ values = {
         "mood": ["Sunrise", "Day", "Sunset", "Night"],
         "primarytype": ["Race", "Puzzle", "Platform", "Stunts", "Shortcut", "Laps"],
         "unlimiterver": ["Any", "0.4", "0.6", "0.7", "1.1", "1.2", "1.3", "2.0"],
+        "inauthortimebeaten": ["Not Beaten", "Beaten"],
         "order1": [
             "",
             "Uploaded (Oldest)",
