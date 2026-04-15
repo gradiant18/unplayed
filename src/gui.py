@@ -254,6 +254,14 @@ class MainWindow(QMainWindow):
         order.addWidget(self.order_check)
         order.addWidget(self.order1)
 
+        self.inauthortimebeaten = self.make_combobox("inauthortimebeaten")
+        self.inauthortimebeaten_check = self.make_checkbox(
+            "Author Time", "inauthortimebeaten"
+        )
+        authortimebeaten = QVBoxLayout()
+        authortimebeaten.addWidget(self.inauthortimebeaten_check)
+        authortimebeaten.addWidget(self.inauthortimebeaten)
+
         self.start_button = QPushButton("Start")
         self.start_button.setStyleSheet("background-color: green")
         self.start_button.clicked.connect(self.start)
@@ -286,13 +294,17 @@ class MainWindow(QMainWindow):
         main5.addLayout(inhasrecord)
         main5.addLayout(unlimiter)
 
+        main6 = QHBoxLayout()
+        main6.addLayout(order)
+        main6.addLayout(authortimebeaten)
+
         layout = QVBoxLayout()
         layout.addLayout(main)
         layout.addLayout(main2)
         layout.addLayout(main3)
         layout.addLayout(main4)
         layout.addLayout(main5)
-        layout.addLayout(order)
+        layout.addLayout(main6)
         layout.addWidget(self.start_button)
         layout.addWidget(self.save_button)
         tab = QWidget()
