@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QPushButton,
+    QMessageBoxو
 )
 
 
@@ -98,7 +99,17 @@ class SettingsTab(QWidget):
     def update_paths(self):
         self.filename_edit.setText(self.data["exe_path"])
         self.dir_name_edit.setText(self.data["track_dir"])
-
+    
     def delete_data(self):
-        data_path = self.data["app_dir"]
-        shutil.rmtree(data_path)
+        # إضافة رسالة تأكيد لتوحيد نمط الكود في المشروع (Consistency)
+        reply = QMessageBox.question(
+            self,
+            "Delete All Data",
+            "Are you sure you want to delete all data? This cannot be undone.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+
+        # لا يتم المسح إلا إذا ضغط المستخدم على Yes
+        if reply == QMessageBox.StandardButton.Yes:
+            data_path = self.data["app_dir"]
+            shutil.rmtree(data_path)
