@@ -5,6 +5,7 @@ import time
 from banned_tracks import BannedTracksTab
 from common.exchange import values
 from common.game import Game
+from common.text_input import TextInput
 from datetime import datetime, timedelta
 from find_paths import FindExe, FindTracks
 from settings import SettingsTab
@@ -74,14 +75,187 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.tabs)
         self.stacked_widget.addWidget(config_widget)
 
-    def make_game_widget(self):
+    def make_game_widget(self) -> None:
         game_widget = QWidget()
         layout = QVBoxLayout(game_widget)
         game_tab = self.make_game_tab()
         layout.addWidget(game_tab)
         self.stacked_widget.addWidget(game_widget)
 
+    def change_preset(self, new_preset) -> None:
+        print("change_preset was called:", new_preset)
+        if self.data["preset"] == "---":
+            self.preset_combo.currentTextChanged.disconnect()
+            self.preset_combo.clear()
+            self.preset_combo.addItems(self.data["presets"])
+            self.preset_combo.setCurrentText(new_preset)
+            self.preset_combo.currentTextChanged.connect(
+                lambda preset: self.change_preset(preset)
+            )
+
+        self.data["preset"] = new_preset
+        self.data["game_rules"] = copy.deepcopy(
+            self.data["presets"][new_preset]["game_rules"]
+        )
+        self.data["track_rules"] = copy.deepcopy(
+            self.data["presets"][new_preset]["track_rules"]
+        )
+        self.update_options()
+
+    def update_options(self):
+        next_mode = self.data["game_rules"]["next_mode"]
+        text = "WR" if next_mode == "wr" else next_mode.capitalize()
+        self.mode_combo.setCurrentText(text)
+
+        self.track_limit.setValue(self.data["game_rules"]["track_limit"]["value"])
+        self.track_check.setChecked(self.data["game_rules"]["track_limit"]["state"])
+
+        secs = int(self.data["game_rules"]["time_limit"]["value"].total_seconds())
+        self.time_limit.setTime(QTime(0, 0, 0).addSecs(secs))
+        self.time_check.setChecked(self.data["game_rules"]["time_limit"]["state"])
+
+        self.site.setCurrentText(self.data["game_rules"]["site"])
+
+        seconds = int(self.data["track_rules"]["uploadedafter"]["value"].timestamp())
+        self.uploadedafter.setDateTime(QDateTime().fromSecsSinceEpoch(seconds))
+        self.uploadedafter_check.setChecked(
+            self.data["track_rules"]["uploadedafter"]["state"]
+        )
+
+        seconds = int(self.data["track_rules"]["uploadedbefore"]["value"].timestamp())
+        self.uploadedbefore.setDateTime(QDateTime().fromSecsSinceEpoch(seconds))
+        self.before_check.setChecked(
+            self.data["track_rules"]["uploadedbefore"]["state"]
+        )
+
+        min = self.data["track_rules"]["authortimemin"]["value"]
+        self.authortimemin.setTime(QTime(0, 0, 0).fromMSecsSinceStartOfDay(min))
+        self.authortimemin_check.setChecked(
+            self.data["track_rules"]["authortimemin"]["state"]
+        )
+
+        max = self.data["track_rules"]["authortimemax"]["value"]
+        self.authortimemax.setTime(QTime(0, 0, 0).fromMSecsSinceStartOfDay(max))
+        self.authortimemax_check.setChecked(
+            self.data["track_rules"]["authortimemax"]["state"]
+        )
+        print(min, max)
+
+        for option in self.data["track_rules"]:
+            if option in [
+                "uploadedafter",
+                "uploadedbefore",
+                "authortimemin",
+                "authortimemax",
+            ]:
+                continue
+            if option == "inunlimiter":
+                self.inunlimeter_check.setChecked(
+                    self.data["track_rules"]["inunlimiter"]["state"]
+                )
+
+            option_combo = getattr(self, option, None)
+            if option_combo:
+                option_combo.setCurrentText(self.data["track_rules"][option]["text"])
+
+            option_check = getattr(self, f"{option}_check", None)
+            if option_check:
+                option_check.setChecked(self.data["track_rules"][option]["state"])
+
+    def save_preset(self) -> None:
+        if self.data["preset"] == "---":
+            QMessageBox.warning(
+                self, "No Preset Selected", "Select a preset to save your options!"
+            )
+            return
+        self.data["presets"][self.data["preset"]]["game_rules"] = self.data[
+            "game_rules"
+        ]
+        self.data["presets"][self.data["preset"]]["track_rules"] = self.data[
+            "track_rules"
+        ]
+        self.save_config()
+
+    def new_preset(self):
+        new_preset_name = TextInput()
+        preset_name = new_preset_name.getText()
+
+        if self.data["presets"].get(preset_name):
+            reply = QMessageBox.question(
+                self,
+                "Preset Already Exists",
+                f"Do you want to overwrite preset {preset_name}?",
+            )
+            if reply == QMessageBox.StandardButton.No:
+                return
+
+        self.data["presets"][preset_name] = copy.deepcopy(
+            self.data["presets"][next(iter(self.data["presets"]))]
+        )
+        self.data["presets"][preset_name]["game_rules"] = copy.deepcopy(
+            self.data["game_rules"]
+        )
+        self.data["presets"][preset_name]["track_rules"] = copy.deepcopy(
+            self.data["track_rules"]
+        )
+        self.preset_combo.addItem(preset_name)
+        # will call self.change_preset(preset_name)
+        self.preset_combo.setCurrentText(preset_name)
+        self.save_config()
+
+    def delete_preset(self):
+        if len(self.data["presets"]) < 2:
+            QMessageBox.warning(
+                self, "One Preset", "You must have at least one preset!"
+            )
+            return
+
+        if self.data["preset"] == "---":
+            QMessageBox.warning(self, "No Preset", "Select a preset to delete it!")
+            return
+
+        reply = QMessageBox.question(
+            self,
+            "Delete Preset",
+            f"Are you sure you want to delete preset {self.data['preset']}?",
+        )
+        if reply == QMessageBox.StandardButton.No:
+            return
+
+        del self.data["presets"][self.data["preset"]]
+        self.preset_combo.currentTextChanged.disconnect()  # don't update ui
+
+        # remove preset from preset_combo
+        self.preset_combo.clear()
+        self.preset_combo.addItem("---")
+        self.preset_combo.addItems(self.data["presets"])
+        self.preset_combo.setCurrentText("---")
+        self.data["preset"] = "---"
+        self.preset_combo.currentTextChanged.connect(
+            lambda preset: self.change_preset(preset)
+        )
+        self.save_config()
+
     def make_options_tab(self) -> QWidget:
+        # preset
+        self.preset_combo = QComboBox()
+        self.preset_combo.addItems(self.data["presets"])
+        self.preset_combo.setCurrentText(self.data["preset"])
+        self.preset_combo.currentTextChanged.connect(
+            lambda preset: self.change_preset(preset)
+        )
+        self.preset_save = QPushButton("Save")
+        self.preset_save.clicked.connect(self.save_preset)
+        self.preset_new = QPushButton("Save As")
+        self.preset_new.clicked.connect(self.new_preset)
+        self.preset_delete = QPushButton("Delete")
+        self.preset_delete.clicked.connect(self.delete_preset)
+        presets = QHBoxLayout()
+        presets.addWidget(self.preset_combo)
+        presets.addWidget(self.preset_save)
+        presets.addWidget(self.preset_new)
+        presets.addWidget(self.preset_delete)
+
         # next_mode
         self.mode_label = QLabel(text="Next Mode")
         self.mode_combo = QComboBox()
@@ -106,22 +280,23 @@ class MainWindow(QMainWindow):
         self.track_limit.valueChanged.connect(
             lambda val: self.game_rule_changed("track_limit", val)
         )
-        self.track_box = self.make_checkbox("Track Limit", "track_limit")
+        self.track_check = self.make_checkbox("Track Limit", "track_limit")
         track = QVBoxLayout()
-        track.addWidget(self.track_box)
+        track.addWidget(self.track_check)
         track.addWidget(self.track_limit)
 
         # time_limit
         self.time_limit = QTimeEdit()
+        self.time_limit.setMinimumTime(QTime(0, 1, 0))
         self.time_limit.setDisplayFormat("HH:mm:ss")
         limit = int(self.data["game_rules"]["time_limit"]["value"].total_seconds())
         self.time_limit.setTime(QTime(0, 0, 0).addSecs(limit))
         self.time_limit.timeChanged.connect(
             lambda val: self.game_rule_changed("time_limit", val)
         )
-        self.time_box = self.make_checkbox("Time Limit", "time_limit")
+        self.time_check = self.make_checkbox("Time Limit", "time_limit")
         tme = QVBoxLayout()
-        tme.addWidget(self.time_box)
+        tme.addWidget(self.time_check)
         tme.addWidget(self.time_limit)
 
         # site
@@ -144,9 +319,9 @@ class MainWindow(QMainWindow):
         self.uploadedafter.dateTimeChanged.connect(
             lambda val: self.track_rule_changed("uploadedafter", val)
         )
-        self.after_box = self.make_checkbox("Uploaded After", "uploadedafter")
+        self.uploadedafter_check = self.make_checkbox("Uploaded After", "uploadedafter")
         after = QVBoxLayout()
-        after.addWidget(self.after_box)
+        after.addWidget(self.uploadedafter_check)
         after.addWidget(self.uploadedafter)
 
         # uploadedbefore
@@ -157,9 +332,9 @@ class MainWindow(QMainWindow):
         self.uploadedbefore.dateTimeChanged.connect(
             lambda val: self.track_rule_changed("uploadedbefore", val)
         )
-        self.before_box = self.make_checkbox("Uploaded Before", "uploadedbefore")
+        self.before_check = self.make_checkbox("Uploaded Before", "uploadedbefore")
         before = QVBoxLayout()
-        before.addWidget(self.before_box)
+        before.addWidget(self.before_check)
         before.addWidget(self.uploadedbefore)
 
         # authortimemin
@@ -249,9 +424,9 @@ class MainWindow(QMainWindow):
         unlimiter.addWidget(self.unlimiterver)
 
         self.order1 = self.make_combobox("order1")
-        self.order_check = self.make_checkbox("Sort Order", "order1")
+        self.order1_check = self.make_checkbox("Sort Order", "order1")
         order = QVBoxLayout()
-        order.addWidget(self.order_check)
+        order.addWidget(self.order1_check)
         order.addWidget(self.order1)
 
         self.start_button = QPushButton("Start")
@@ -287,6 +462,7 @@ class MainWindow(QMainWindow):
         main5.addLayout(unlimiter)
 
         layout = QVBoxLayout()
+        layout.addLayout(presets)
         layout.addLayout(main)
         layout.addLayout(main2)
         layout.addLayout(main3)

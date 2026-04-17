@@ -2,10 +2,13 @@ import argparse
 import os
 import pickle
 import platform
+import semver
 import sys
 from common.default_data import default_data
 from gui import MainWindow
 from PyQt6.QtWidgets import QApplication
+
+version = semver.Version.parse("2.0.0")
 
 
 def main():
@@ -39,6 +42,10 @@ def main():
     if os.path.exists(data_path):
         with open(data_path, "rb") as file:
             data = pickle.load(file)
+        # data.bin version not current, use default
+        # This should change to add/remove changed data
+        if version.major > semver.Version.parse(data.get("version", "1.2.0")).major:
+            data = default_data
     else:
         print("Loading default data")
         data = default_data
