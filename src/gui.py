@@ -5,7 +5,6 @@ import time
 from banned_tracks import BannedTracksTab
 from common.exchange import values
 from common.game import Game
-from common.text_input import TextInput
 from datetime import datetime, timedelta
 from find_paths import FindExe, FindTracks
 from settings import SettingsTab
@@ -15,6 +14,7 @@ from PyQt6.QtWidgets import (
     QDateTimeEdit,
     QFrame,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QMainWindow,
     QMessageBox,
@@ -83,7 +83,6 @@ class MainWindow(QMainWindow):
         self.stacked_widget.addWidget(game_widget)
 
     def change_preset(self, new_preset) -> None:
-        print("change_preset was called:", new_preset)
         if self.data["preset"] == "---":
             self.preset_combo.currentTextChanged.disconnect()
             self.preset_combo.clear()
@@ -139,7 +138,6 @@ class MainWindow(QMainWindow):
         self.authortimemax_check.setChecked(
             self.data["track_rules"]["authortimemax"]["state"]
         )
-        print(min, max)
 
         for option in self.data["track_rules"]:
             if option in [
@@ -177,8 +175,18 @@ class MainWindow(QMainWindow):
         self.save_config()
 
     def new_preset(self):
-        new_preset_name = TextInput()
-        preset_name = new_preset_name.getText()
+        while True:
+            preset_name, ok = QInputDialog.getText(
+                self, "New Preset", "Name your new preset:"
+            )
+            if not ok:
+                return
+            if preset_name == "":
+                QMessageBox.warning(
+                    self, "Empty Preset Name", "Please give your preset a name."
+                )
+                continue
+            break
 
         if self.data["presets"].get(preset_name):
             reply = QMessageBox.question(
