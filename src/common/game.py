@@ -20,7 +20,7 @@ class Handler(PatternMatchingEventHandler):
         self.session = session
 
     def on_modified(self, event) -> None:
-        self.session.update_session(event.src_path)
+        self.session.new_autosave(event.src_path)
 
 
 class Game:
@@ -28,7 +28,7 @@ class Game:
         self.update_config(config)
         self.parent_window = parent_window
 
-        self.autosave_data = self.update_autosaves()
+        self.autosave_data = self.__update_autosaves()
         self.autosaves = self.autosave_data["autosaves"]
         self.next = Queue(maxsize=1)
         self.observer = None
@@ -44,23 +44,13 @@ class Game:
         self.stop_time = None
         self.stop_reason = None
 
-    def update_config(self, config) -> None:
-        self.config = config
-        self.set_dirs()
-
-    def set_dirs(self) -> None:
-        self.exe = self.config["exe_path"]
-        self.track_dir = self.config["track_dir"]
-        self.autosave_dir = os.path.join(
-            self.config["track_dir"], "Replays", "Autosaves"
-        )
-
     def start(self) -> None:
-        self.autosave_data = self.update_autosaves()
+        self.autosave_data = self.__update_autosaves()
         self.autosaves = self.autosave_data["autosaves"]
         self.next = Queue(maxsize=1)
         self.tracks = []
         self.finished = {}
+        self.skipped = self.__get_skipped_tracks()
 
         self.go_next = False
         self.fetching_done = False
@@ -82,12 +72,11 @@ class Game:
             and self.config["banned_tracks"].get(self.site)
             else set()
         )
-        self.skipped = self.get_skipped_tracks()
         if self.time_limit.total_seconds() > 0:
             self.stop_time = self.start_time + self.time_limit
 
-        threading.Thread(target=self.get_tracks, daemon=True).start()
-        threading.Thread(target=self.main, daemon=True).start()
+        threading.Thread(target=self.__daemon_main, daemon=True).start()
+        threading.Thread(target=self.__daemon_get_tracks, daemon=True).start()
 
         while not self.tracks and not self.fetching_done:
             time.sleep(0.1)
@@ -99,42 +88,16 @@ class Game:
         if self.track_limit == 0:
             self.track_limit = len(self.tracks)
 
-        threading.Thread(target=self.downloader, daemon=True).start()
+        threading.Thread(target=self.__daemon_downloader, daemon=True).start()
 
         self.go_next = True
         self.observer = Observer()
         self.observer.schedule(Handler(self), path=self.autosave_dir, recursive=False)
         self.observer.start()
 
-    def main(self) -> None:
-        while not self.stop_session:
-            if (
-                self.track_limit
-                and len(self.finished) >= 1
-                and len(self.finished) >= self.track_limit
-            ):
-                self.parent_window.log("[STOP] Track limit reached")
-                self.stop("Track Limit Reached")
-                break
-            if self.stop_time and datetime.now() > self.stop_time:
-                self.parent_window.log("[STOP] Time limit reached")
-                self.stop("Time Limit Reached")
-                break
-
-            if self.go_next:
-                try:
-                    self.current = self.next.get(timeout=0.5)
-                    if not self.config["no_launch"]:
-                        self.current.load(self.config["exe_path"])
-                    self.go_next = False
-                except Empty:
-                    pass
-            time.sleep(0.01)
-
     def stop(self, reason="") -> None:
         self.stop_session = True
-        if not self.stop_reason:
-            self.stop_reason = reason
+        self.stop_reason = reason
         if self.observer:
             self.observer.stop()
             self.observer.join()
@@ -154,38 +117,16 @@ class Game:
         time.sleep(0.5)
         self.current.load(self.config["exe_path"])
 
-    def downloader(self) -> None:
-        while len(self.tracks) > 0 and not self.stop_session:
-            if self.config["sorted"] == 2:
-                track = self.tracks.pop(0)
-            else:
-                track = random.choice(self.tracks)
-                self.tracks.remove(track)
+    def update_config(self, config) -> None:
+        self.config = config
+        self.exe = self.config["exe_path"]
+        self.track_dir = self.config["track_dir"]
+        self.autosave_dir = os.path.join(
+            self.config["track_dir"], "Replays", "Autosaves"
+        )
 
-            if track.uid in self.autosaves:
-                continue
-
-            track.download(self.track_dir, self.site)
-            while not self.stop_session:
-                try:
-                    self.next.put(track, timeout=0.5)
-                    break
-                except Full:
-                    continue
-
-    def get_uid(self, path):
-        for _ in range(10):
-            with open(path, "rb") as file:
-                data = file.read(4096)
-            if not data:
-                time.sleep(0.001)
-                continue
-            if match := re.search(rb'uid="(\w*)"', data):
-                return match.group(1).decode("utf-8")
-            time.sleep(0.001)
-
-    def update_session(self, replay_path) -> None:
-        replay_uid = self.get_uid(replay_path)
+    def new_autosave(self, replay_path) -> None:
+        replay_uid = self.__get_uid(replay_path)
         if not hasattr(self, "current") or self.current.uid != replay_uid:
             # different track played
             return
@@ -210,12 +151,13 @@ class Game:
         if len(self.tracks) >= 0 and not self.stop_session:
             self.go_next = True
 
-    def get_tracks_left(self) -> int | None:
-        if self.track_limit:
-            return self.track_limit - len(self.finished)
-        return None
+    def get_autosave_data(self) -> dict | None:
+        return getattr(self, "autosave_data", None)
 
-    def get_time_left(self) -> str | None:
+    def get_current(self) -> Track | None:
+        return getattr(self, "current", None)
+
+    def get_formatted_time_left(self) -> str | None:
         if self.stop_time:
             td = self.stop_time - datetime.now()
             hours, remainder = divmod(td.seconds, 3600)
@@ -224,65 +166,37 @@ class Game:
             return f"{hours:02d}:{minutes:02d}:{int(seconds):02d}"
         return None
 
-    def get_current(self) -> Track | None:
-        try:
-            return self.current
-        except AttributeError:
-            return None
+    def get_tracks_left(self) -> int | None:
+        if self.track_limit:
+            return self.track_limit - len(self.finished)
+        return None
 
-    def get_skipped_tracks(self) -> set:
-        if not hasattr(self, "site"):
-            return set()
-        path = os.path.join(self.config["app_dir"], f"{self.site}_skipped.txt")
-        if not os.path.exists(path):
-            return set()
-        with open(path) as file:
-            data = file.read()
-        pattern = re.compile(r"\d+")
-        matches = list(pattern.finditer(data))
-        if not matches:
-            return set()
-        return {int(x.group(0)) for x in matches}
+    def __daemon_main(self) -> None:
+        while not self.stop_session:
+            if (
+                self.track_limit
+                and len(self.finished) >= 1
+                and len(self.finished) >= self.track_limit
+            ):
+                self.parent_window.log("[STOP] Track limit reached")
+                self.stop("Track Limit Reached")
+                break
+            if self.stop_time and datetime.now() > self.stop_time:
+                self.parent_window.log("[STOP] Time limit reached")
+                self.stop("Time Limit Reached")
+                break
 
-    def get_autosaves(self):
-        path = os.path.join(self.config["app_dir"], "autosaves.bin")
-        if not os.path.exists(path):
-            return {"oldest": 0, "autosaves": None}
-        with open(path, "rb") as file:
-            data = pickle.load(file)
-        if not data:
-            data = {"oldest": 0, "autosaves": None}
-        return data
+            if self.go_next:
+                try:
+                    self.current = self.next.get(timeout=0.5)
+                    if not self.config["no_launch"]:
+                        self.current.load(self.config["exe_path"])
+                    self.go_next = False
+                except Empty:
+                    pass
+            time.sleep(0.01)
 
-    def update_autosaves(self):
-        autosave_data = self.get_autosaves()
-        files = []
-        oldest = autosave_data.get("oldest", None)
-        if not oldest:
-            oldest = 0
-            autosave_data["oldest"] = 0
-
-        for entry in os.scandir(self.autosave_dir):
-            if not entry.is_file():
-                continue
-            if (old := os.path.getmtime(entry)) <= autosave_data["oldest"]:
-                continue
-
-            files.append(entry.path)
-            if old > oldest:
-                oldest = old
-        autosave_data["oldest"] = oldest
-
-        with ThreadPoolExecutor(max_workers=10) as exe:
-            autosaves = set(exe.map(self.get_uid, files))
-
-        if not autosave_data.get("autosaves"):
-            autosave_data["autosaves"] = autosaves
-        else:
-            autosave_data["autosaves"].update(autosaves)
-        return autosave_data
-
-    def get_tracks(self):
+    def __daemon_get_tracks(self):
         api_url = f"https://{values[self.site]['url']}/api/tracks?"
         params = {
             "fields": "TrackId,TrackName,UId,AuthorTime,GoldTarget,SilverTarget,BronzeTarget,WRReplay.ReplayTime",
@@ -347,9 +261,28 @@ class Game:
         original_limit = self.config["game_rules"]["track_limit"]
         if not original_limit or self.track_limit > len(self.tracks):
             self.track_limit = len(self.tracks)
-        self.detect_uid_clash()
+        self.__detect_uid_clash()
 
-    def detect_uid_clash(self):
+    def __daemon_downloader(self) -> None:
+        while len(self.tracks) > 0 and not self.stop_session:
+            if self.config["sorted"] == 2:
+                track = self.tracks.pop(0)
+            else:
+                track = random.choice(self.tracks)
+                self.tracks.remove(track)
+
+            if track.uid in self.autosaves:
+                continue
+
+            track.download(self.track_dir, self.site)
+            while not self.stop_session:
+                try:
+                    self.next.put(track, timeout=0.5)
+                    break
+                except Full:
+                    continue
+
+    def __detect_uid_clash(self):
         processed_uids = {}
         for track in self.tracks:
             if track.wr:
@@ -363,3 +296,63 @@ class Game:
             else:
                 processed_uids[track.uid] = track.track_id
         return processed_uids
+
+    def __get_skipped_tracks(self) -> set:
+        if not hasattr(self, "site"):
+            return set()
+        path = os.path.join(self.config["app_dir"], f"{self.site}_skipped.txt")
+        if not os.path.exists(path):
+            return set()
+        with open(path) as file:
+            data = file.read()
+        pattern = re.compile(r"\d+")
+        matches = list(pattern.finditer(data))
+        if not matches:
+            return set()
+        return {int(x.group(0)) for x in matches}
+
+    def __get_uid(self, path):
+        for _ in range(10):
+            with open(path, "rb") as file:
+                data = file.read(4096)
+            if not data:
+                time.sleep(0.001)
+                continue
+            if match := re.search(rb'uid="(\w*)"', data):
+                return match.group(1).decode("utf-8")
+            time.sleep(0.001)
+
+    def __update_autosaves(self):
+        autosave_data = {"oldest": 0, "autosaves": None}
+        path = os.path.join(self.config["app_dir"], "autosaves.bin")
+        if os.path.exists(path):
+            with open(path, "rb") as file:
+                file_data = pickle.load(file)
+            if file_data:
+                autosave_data = file_data
+
+        files = []
+        oldest = autosave_data.get("oldest", None)
+        if not oldest:
+            oldest = 0
+            autosave_data["oldest"] = 0
+
+        for entry in os.scandir(self.autosave_dir):
+            if not entry.is_file():
+                continue
+            if (old := os.path.getmtime(entry)) <= autosave_data["oldest"]:
+                continue
+
+            files.append(entry.path)
+            if old > oldest:
+                oldest = old
+        autosave_data["oldest"] = oldest
+
+        with ThreadPoolExecutor(max_workers=10) as exe:
+            autosaves = set(exe.map(self.__get_uid, files))
+
+        if not autosave_data.get("autosaves"):
+            autosave_data["autosaves"] = autosaves
+        else:
+            autosave_data["autosaves"].update(autosaves)
+        return autosave_data
