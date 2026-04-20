@@ -15,7 +15,7 @@ from watchdog.events import PatternMatchingEventHandler
 
 
 class Handler(PatternMatchingEventHandler):
-    def __init__(self, session):
+    def __init__(self, session) -> None:
         super().__init__(patterns=["*.gbx"], ignore_directories=True)
         self.session = session
 
@@ -24,7 +24,7 @@ class Handler(PatternMatchingEventHandler):
 
 
 class Game:
-    def __init__(self, parent_window, config):
+    def __init__(self, parent_window, config) -> None:
         self.update_config(config)
         self.parent_window = parent_window
 
@@ -196,7 +196,7 @@ class Game:
                     pass
             time.sleep(0.01)
 
-    def __daemon_get_tracks(self):
+    def __daemon_get_tracks(self) -> None:
         api_url = f"https://{values[self.site]['url']}/api/tracks?"
         params = {
             "fields": "TrackId,TrackName,UId,AuthorTime,GoldTarget,SilverTarget,BronzeTarget,WRReplay.ReplayTime",
@@ -282,7 +282,7 @@ class Game:
                 except Full:
                     continue
 
-    def __detect_uid_clash(self):
+    def __detect_uid_clash(self) -> dict:
         processed_uids = {}
         for track in self.tracks:
             if track.wr:
@@ -311,7 +311,7 @@ class Game:
             return set()
         return {int(x.group(0)) for x in matches}
 
-    def __get_uid(self, path):
+    def __get_uid(self, path) -> str | None:
         for _ in range(10):
             with open(path, "rb") as file:
                 data = file.read(4096)
@@ -322,7 +322,7 @@ class Game:
                 return match.group(1).decode("utf-8")
             time.sleep(0.001)
 
-    def __update_autosaves(self):
+    def __update_autosaves(self) -> dict:
         autosave_data = {"oldest": 0, "autosaves": None}
         path = os.path.join(self.config["app_dir"], "autosaves.bin")
         if os.path.exists(path):
