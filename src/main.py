@@ -16,10 +16,17 @@ def main():
     parser.add_argument(
         "-n", "--nolaunch", action="store_true", help="Don't launch tracks in game"
     )
-    parser.add_argument("-s", "--savehere", action="store_true", help="Save files here")
+    parser.add_argument(
+        "-s",
+        "--savehere",
+        action="store_true",
+        help="Save files in current working directory",
+    )
 
     args = parser.parse_args()
 
+    # get app_dir
+    app_dir = ""
     if not args.savehere:
         if platform.system() == "Windows":
             app_dir = os.path.join(str(os.getenv("APPDATA")), "unplayed")
@@ -29,10 +36,6 @@ def main():
             app_dir = os.path.expanduser("~/.unplayed")
             if not os.path.exists(app_dir):
                 os.mkdir(app_dir)
-        else:
-            app_dir = ""
-    else:
-        app_dir = ""
 
     # empty log.txt
     with open(os.path.join(app_dir, "log.log"), "w") as file:
@@ -43,7 +46,7 @@ def main():
         with open(data_path, "rb") as file:
             data = pickle.load(file)
         # data.bin version not current, use default
-        # This should change to add/remove changed data
+        # In the future, this should change to add/remove changed data
         if version.major > semver.Version.parse(data.get("version", "1.2.0")).major:
             data = default_data
     else:

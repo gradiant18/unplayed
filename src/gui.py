@@ -741,7 +741,7 @@ class MainWindow(QMainWindow):
 
                 progress = max - (stop_time.timestamp() - time.time())
                 self.time_progress_bar.setValue(int(progress))
-                self.time_label.setText(f"{self.session.get_time_left():^10}")
+                self.time_label.setText(f"{self.session.get_formatted_time_left():^10}")
 
         try:
             name = self.session.current.name
@@ -829,7 +829,7 @@ class MainWindow(QMainWindow):
         if self.data["app_dir"] != "" and not os.path.exists(self.data["app_dir"]):
             os.mkdir(self.data["app_dir"])
 
-        self.save_autosaves(self.session.get_autosaves())
+        self.save_autosaves(self.session.get_autosave_data())
         self.save_skipped(self.session.skipped)
 
         data_path = os.path.join(self.data["app_dir"], "data.bin")
