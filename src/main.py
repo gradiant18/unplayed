@@ -1,14 +1,13 @@
 import argparse
-import os
-import pickle
-import platform
-import semver
 import sys
-from common.default_data import default_data
-from gui import MainWindow
+
 from PyQt6.QtWidgets import QApplication
 
-version = semver.Version.parse("2.0.0")
+from model import ConfigModel
+from presenter import AppPresenter
+from view import MainWindow
+
+VERSION = "2.0.0"
 
 
 def main():
@@ -22,44 +21,14 @@ def main():
         action="store_true",
         help="Save files in current working directory",
     )
-
     args = parser.parse_args()
 
-    # get app_dir
-    app_dir = ""
-    if not args.savehere:
-        if platform.system() == "Windows":
-            app_dir = os.path.join(str(os.getenv("APPDATA")), "unplayed")
-            if not os.path.exists(app_dir):
-                os.mkdir(app_dir)
-        elif platform.system() == "Linux":
-            app_dir = os.path.expanduser("~/.unplayed")
-            if not os.path.exists(app_dir):
-                os.mkdir(app_dir)
-
-    # empty log.txt
-    with open(os.path.join(app_dir, "log.log"), "w") as file:
-        file.write("")
-
-    data_path = os.path.join(app_dir, "data.bin")
-    if os.path.exists(data_path):
-        with open(data_path, "rb") as file:
-            data = pickle.load(file)
-        # data.bin version not current, use default
-        # In the future, this should change to add/remove changed data
-        if version.major > semver.Version.parse(data.get("version", "1.2.0")).major:
-            data = default_data
-    else:
-        print("Loading default data")
-        data = default_data
-
-    data["app_dir"] = app_dir
-    data["no_launch"] = args.nolaunch
-
     app = QApplication(sys.argv)
-    window = MainWindow(data)
-    window.show()
-    app.exec()
+    model = ConfigModel(VERSION, args.savehere, args.nolaunch)
+    view = MainWindow()
+    presenter = AppPresenter(model, view)
+    view.show()
+    sys.exit(app.exec())
 
 
 if __name__ == "__main__":
