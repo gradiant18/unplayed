@@ -1,3 +1,7 @@
+import datetime
+
+today = datetime.datetime.today()
+
 values = {
     "all": {
         "mode": ["Author", "Gold", "Silver", "Bronze", "Finished", "WR"],
@@ -169,5 +173,60 @@ values = {
             "Grass",
         ],
         "environment": ["", "", "", "", "", "", "", "Stadium"],
+    },
+}
+
+default_data = {
+    "version": "2.0.0",
+    "exe_path": "",
+    "track_dir": "",
+    "app_dir": "",
+    "force_window_size": True,
+    "auto_update": False,
+    "skip_skipped": True,
+    "default_data": True,
+    "game_rules": {},
+    "track_rules": {},
+    "preset": "Default",
+    "presets": {
+        "Default": {
+            "game_rules": {
+                "next_mode": "finished",
+                "track_limit": {"state": 0, "value": 1},
+                "time_limit": {"state": 2, "value": datetime.timedelta(minutes=15)},
+                "site": "TMNF-X",
+            },
+            "track_rules": {
+                "uploadedafter": {
+                    "state": 0,
+                    "value": datetime.datetime(2008, 4, 3, 0, 0, 0),
+                },
+                "uploadedbefore": {
+                    "state": 0,
+                    "value": datetime.datetime(
+                        today.year, today.month, today.day, 23, 59, 59
+                    ),
+                },
+                "authortimemin": {"state": 0, "value": 0},
+                "authortimemax": {"state": 0, "value": 0},
+                "inunlimiter": {"state": 0, "value": 0},
+                "unlimiterver": {"state": 0, "value": 0},
+                "tag": {"state": 0, "value": 0},
+                "primarytype": {"state": 0, "value": 0},
+                "environment": {"state": 0, "value": 7},
+                "mood": {"state": 0, "value": 1},
+                "difficulty": {"state": 0, "value": 0},
+                "inhasrecord": {"state": 2, "value": 0},
+                "inauthortimebeaten": {"state": 0, "value": 0},
+                "order1": {"state": 2, "value": 39},
+            },
+        }
+    },
+    "banned_tracks": {
+        "TMUF-X": set(),
+        "TMNF-X": set(),
+        "TMO-X": set(),
+        "TMS-X": set(),
+        "TMN-X": set(),
     },
 }
