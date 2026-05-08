@@ -1,5 +1,6 @@
 import re
-from PyQt6.QtCore import QDateTime, QTime, Qt, pyqtSignal
+
+from PyQt6.QtCore import QDateTime, Qt, QTime, pyqtSignal
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -85,6 +86,7 @@ class FindPath(QDialog):
 class SettingsTab(QWidget):
     settings_changed = pyqtSignal(dict)
     delete_data_requested = pyqtSignal()
+    rescan_autosaves = pyqtSignal()
     save_requested = pyqtSignal()
     find_exe = pyqtSignal()
     find_track = pyqtSignal()
@@ -126,6 +128,9 @@ class SettingsTab(QWidget):
         # TODO: app_dir path and browse
 
         # TODO: rescan autosaves button
+        btn_scan = QPushButton("Rescan autosaves")
+        btn_scan.clicked.connect(self.rescan_autosaves.emit)
+        layout.addWidget(btn_scan)
 
         btn_delete = QPushButton("Delete all data")
         btn_delete.clicked.connect(self.delete_data_requested.emit)
@@ -509,8 +514,13 @@ class OptionsTab(QWidget):
                     QDateTime().fromSecsSinceEpoch(int(config["value"].timestamp()))
                 )
             elif isinstance(wdg, QComboBox):
-                text = values[game_rules["site"]].get(key, values["all"].get(key))
-                wdg.setCurrentText(text[config["value"]])
+                possible_text = values[game_rules["site"]].get(
+                    key, values["all"].get(key)
+                )
+                text = possible_text[0]
+                if len(possible_text) > config["value"]:
+                    text = possible_text[config["value"]]
+                wdg.setCurrentText(text)
 
             chk.blockSignals(False)
             wdg.blockSignals(False)
