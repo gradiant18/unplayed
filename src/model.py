@@ -5,15 +5,16 @@ import pickle
 import platform
 import random
 import re
-import requests
-import semver
 import subprocess
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from io import StringIO
-from queue import Queue, Empty, Full
+from queue import Empty, Full, Queue
+
+import requests
+import semver
 from watchdog.events import PatternMatchingEventHandler
 from watchdog.observers import Observer
 
@@ -26,29 +27,111 @@ class ConfigModel:
         self.no_launch = no_launch
         self.data = copy.deepcopy(default_data)
 
-        self.app_dir = "unplayed"
-        if not save_here:
-            if platform.system() == "Windows":
-                self.app_dir = os.path.join(str(os.getenv("APPDATA")), "unplayed")
-            elif platform.system() == "Linux":
-                self.app_dir = os.path.expanduser("~/.unplayed")
+        if platform.system() == "Windows":
+            self.app_dir = os.path.join(str(os.getenv("APPDATA")), "unplayed")
+        elif platform.system() == "Linux":
+            self.app_dir = os.path.expanduser("~/.unplayed")
+        if save_here:
+            self.app_dir = "unplayed"
 
-        if self.app_dir and not os.path.exists(self.app_dir):
+        if not os.path.exists(self.app_dir):
             os.mkdir(self.app_dir)
 
-        log_path = os.path.join(self.app_dir, "log.log") if self.app_dir else "log.log"
+        log_path = os.path.join(self.app_dir, "log.log")
         open(log_path, "w").close()
 
+        # PERF: start up performance?
+        # self.update_autosave_data()
         self.load_data()
         self.test_data()
         self.data["app_dir"] = self.app_dir
         self.data["no_launch"] = self.no_launch
 
+    def load_skipped(self) -> set:
+        """Loads skipped tracks from file"""
+        site = self.data["game_rules"].get("site")
+        path = os.path.join(self.app_dir, f"{site}_skipped.txt")
+        if not os.path.exists(path):
+            print(f"{path} doesn't exists, no skipped tracks")
+            return set()
+        with open(path) as file:
+            data = file.read()
+        return {int(x.group(0)) for x in re.finditer(r"\d+", data)}
+
+    def save_skipped(self, site: str, skipped: set):
+        """Saves skipped tracks to file"""
+        path = os.path.join(self.app_dir, f"{site}_skipped.txt")
+        with open(path, "w") as file:
+            for track_id in skipped:
+                file.write(f"https://{values[site]['url']}/trackshow/{track_id}\n")
+
+    def _get_uid(self, path: str) -> str | None:
+        """Gets UID for path"""
+        for _ in range(10):
+            try:
+                with open(path, "rb") as file:
+                    data = file.read(4096)
+                if data and (match := re.search(rb'uid="(\w*)"', data)):
+                    return match.group(1).decode("utf-8")
+            except Exception:
+                pass
+            time.sleep(0.001)
+        return None
+
+    def _load_autosave_data(self) -> dict:
+        """Loads autosave data from file"""
+        autosave_data = {"oldest": 0, "autosaves": set()}
+        path = os.path.join(self.app_dir, "autosaves.bin")
+        if os.path.exists(path):
+            with open(path, "rb") as file:
+                data = pickle.load(file)
+                if data:
+                    autosave_data = data
+        return autosave_data
+
+    def rescan_autosaves(self):
+        autosave_data = self.update_autosave_data({"oldest": 0, "autosaves": set()})
+        return len(autosave_data["autosaves"])
+
+    def update_autosave_data(self, autosave_data=None) -> dict:
+        """Returns updated autosave data"""
+        if not autosave_data:
+            autosave_data = self._load_autosave_data()
+        autosave_dir = os.path.join(self.data["track_dir"], "Replays", "Autosaves")
+        if not os.path.exists(autosave_dir):
+            return autosave_data
+
+        files = []
+        oldest = autosave_data.get("oldest", 0)
+        new_oldest = oldest
+
+        for entry in os.scandir(autosave_dir):
+            if not entry.is_file():
+                continue
+            old = os.path.getmtime(entry)
+            if old > oldest:
+                files.append(entry.path)
+                if old > new_oldest:
+                    new_oldest = old
+
+        autosave_data["oldest"] = new_oldest
+        with ThreadPoolExecutor(max_workers=10) as exe:
+            new_uids = set(exe.map(self._get_uid, files))
+        new_uids.discard(None)
+
+        autosave_data["autosaves"].update(new_uids)
+        return autosave_data
+
+    def save_autosaves(self):
+        """Saves autosave data to file"""
+        path = os.path.join(self.app_dir, "autosaves.bin")
+        autosave_data = self.update_autosave_data()
+        with open(path, "wb") as file:
+            pickle.dump(autosave_data, file)
+
     def load_data(self):
         """Loads data from file"""
-        data_path = (
-            os.path.join(self.app_dir, "data.bin") if self.app_dir else "data.bin"
-        )
+        data_path = os.path.join(self.app_dir, "data.bin")
         if os.path.exists(data_path):
             try:
                 with open(data_path, "rb") as file:
@@ -65,11 +148,9 @@ class ConfigModel:
 
     def save_data(self):
         """Saves data to file"""
-        if self.app_dir and not os.path.exists(self.app_dir):
+        if not os.path.exists(self.app_dir):
             os.mkdir(self.app_dir)
-        data_path = (
-            os.path.join(self.app_dir, "data.bin") if self.app_dir else "data.bin"
-        )
+        data_path = os.path.join(self.app_dir, "data.bin")
         with open(data_path, "wb") as file:
             pickle.dump(self.data, file)
 
@@ -88,7 +169,7 @@ class ConfigModel:
 
     def log(self, msg: str):
         """Saves msg to log file"""
-        log_path = os.path.join(self.app_dir, "log.log") if self.app_dir else "log.log"
+        log_path = os.path.join(self.app_dir, "log.log")
         with open(log_path, "a") as file:
             file.write(f"[{time.time()}] {msg}\n")
 
@@ -131,6 +212,11 @@ class Track:
 
     def load(self, exe_path: str, id: int):
         """Loads track in game"""
+        print(
+            exe_path,
+            id,
+            self.path,
+        )
         cmd = [exe_path, "/singleinst", "/useexedir", f"/file={self.path}"]
         if platform.system() != "Windows":
             cmd = ["protontricks-launch", "--appid", id] + cmd
@@ -169,8 +255,6 @@ class ReplayHandler(PatternMatchingEventHandler):
 class GameSession:
     def __init__(self, config_model: ConfigModel):
         self.config_model = config_model
-        self.autosave_data = self._load_autosaves()
-        self.autosaves = self.autosave_data["autosaves"]
         self.next = Queue(maxsize=1)
         self.observer = None
         self.skipped = set()
@@ -190,12 +274,11 @@ class GameSession:
     def start(self, session_config: dict):
         """Starts game session"""
         self.session_config = session_config
-        self.autosave_data = self._update_autosaves()
-        self.autosaves = self.autosave_data["autosaves"]
+        self.autosaves = self.session_config["autosaves"]
         self.next = Queue(maxsize=1)
         self.tracks = []
         self.finished = {}
-        self.skipped = self._load_skipped()
+        self.skipped = self.session_config["skipped"]
 
         self.go_next = False
         self.fetching_done = False
@@ -252,9 +335,6 @@ class GameSession:
             self.observer.join()
             self.observer = None
 
-        self.autosave_data["autosaves"] = self.autosaves
-        self._save_autosaves()
-        self._save_skipped()
         self.stopped = True
 
     def skip(self):
@@ -292,9 +372,6 @@ class GameSession:
         self.autosaves.add(replay_uid)
         self.finished[self.current.uid] = self.current.medal
         self.config_model.log(f"[FINISHED] {self.finished}")
-
-        self.autosave_data["autosaves"] = self.autosaves
-        self._save_autosaves()
 
         if not self.stop_session:
             self.go_next = True
@@ -405,86 +482,6 @@ class GameSession:
                 pass
             time.sleep(0.001)
         return None
-
-    def _load_autosaves(self) -> dict:
-        """Loads autosave data from file"""
-        autosave_data = {"oldest": 0, "autosaves": set()}
-        path = (
-            os.path.join(self.config_model.app_dir, "autosaves.bin")
-            if self.config_model.app_dir
-            else "autosaves.bin"
-        )
-        if os.path.exists(path):
-            with open(path, "rb") as file:
-                data = pickle.load(file)
-                if data:
-                    autosave_data = data
-        return autosave_data
-
-    def _update_autosaves(self) -> dict:
-        """Updates autosave data with new autosaves"""
-        autosave_data = self._load_autosaves()
-        autosave_dir = os.path.join(
-            self.session_config["track_dir"], "Replays", "Autosaves"
-        )
-        if not os.path.exists(autosave_dir):
-            return autosave_data
-
-        files = []
-        oldest = autosave_data.get("oldest", 0)
-
-        for entry in os.scandir(autosave_dir):
-            if not entry.is_file():
-                continue
-            old = os.path.getmtime(entry)
-            if old > oldest:
-                files.append(entry.path)
-                oldest = old
-
-        autosave_data["oldest"] = oldest
-        with ThreadPoolExecutor(max_workers=10) as exe:
-            new_uids = set(exe.map(self._get_uid, files))
-        new_uids.discard(None)
-
-        autosave_data["autosaves"].update(new_uids)
-        return autosave_data
-
-    def _save_autosaves(self):
-        """Saves autosave data to file"""
-        path = (
-            os.path.join(self.config_model.app_dir, "autosaves.bin")
-            if self.config_model.app_dir
-            else "autosaves.bin"
-        )
-        with open(path, "wb") as file:
-            pickle.dump(self.autosave_data, file)
-
-    def _load_skipped(self) -> set:
-        """Loads skipped tracks from file"""
-        site = self.session_config.get("site", "TMNF-X")
-        path = (
-            os.path.join(self.config_model.app_dir, f"{site}_skipped.txt")
-            if self.config_model.app_dir
-            else f"{site}_skipped.txt"
-        )
-        if not os.path.exists(path):
-            return set()
-        with open(path) as file:
-            data = file.read()
-        return {int(x.group(0)) for x in re.finditer(r"\d+", data)}
-
-    def _save_skipped(self):
-        """Saves skipped tracks to file"""
-        if not self.skipped or not getattr(self, "site", None):
-            return
-        path = (
-            os.path.join(self.config_model.app_dir, f"{self.site}_skipped.txt")
-            if self.config_model.app_dir
-            else f"{self.site}_skipped.txt"
-        )
-        with open(path, "w") as file:
-            for track_id in self.skipped:
-                file.write(f"https://{values[self.site]['url']}/trackshow/{track_id}\n")
 
 
 class BannedTracksFetcher:

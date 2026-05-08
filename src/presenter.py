@@ -2,11 +2,12 @@ import copy
 import os
 import re
 import shutil
-from datetime import timedelta, datetime
-from PyQt6.QtCore import QTimer, QThread, pyqtSignal
+from datetime import datetime, timedelta
 
-from model import ConfigModel, GameSession, BannedTracksFetcher
+from PyQt6.QtCore import QThread, QTimer, pyqtSignal
+
 from common import values
+from model import BannedTracksFetcher, ConfigModel, GameSession
 from view import Dialogs, FindPath
 
 
@@ -46,6 +47,7 @@ class AppPresenter:
         self.view.settings_tab.settings_changed.connect(self.handle_settings_changed)
         self.view.settings_tab.find_exe.connect(self.handle_find_exe)
         self.view.settings_tab.find_track.connect(self.handle_find_track)
+        self.view.settings_tab.rescan_autosaves.connect(self.handle_rescan_autosaves)
         self.view.settings_tab.save_requested.connect(self.save_model)
         self.view.settings_tab.delete_data_requested.connect(self.handle_delete_data)
 
@@ -92,10 +94,17 @@ class AppPresenter:
     def save_model(self):
         self.view.set_status("Saving...")
         self.model.save_data()
+        self.model.save_autosaves()
         self.view.set_status("Saved!", 3000)
 
+    # TODO: change window size, so no restart required
     def handle_settings_changed(self, new_settings):
         self.model.data.update(new_settings)
+
+    def handle_rescan_autosaves(self):
+        self.view.set_status("Scanning...")
+        total = self.model.rescan_autosaves()
+        self.view.set_status(f"Found {total} replays!", 3000)
 
     def handle_delete_data(self):
         if self.model.app_dir:
@@ -359,6 +368,9 @@ class AppPresenter:
             )
 
         config["sorted"] = self.model.data["track_rules"]["order1"]["state"]
+        autosave_data = self.model.update_autosave_data()
+        config["autosaves"] = autosave_data.get("autosaves", set())
+        config["skipped"] = self.model.load_skipped()
         return config
 
     def handle_start_game(self):
@@ -378,16 +390,20 @@ class AppPresenter:
             self.view.setMinimumHeight(220)
             self.view.setMaximumHeight(220)
 
+    def handle_stop(self):
+        self.progress_timer.stop()
+        self.save_model()
+        self.model.save_skipped(self.session.site, self.session.skipped)
+        if self.session.stop_reason:
+            self.view.set_status(self.session.stop_reason, 5000)
+        self.view.show_config()
+        if self.model.data["force_window_size"]:
+            self.view.setMinimumSize(self.view.minimumSizeHint())
+            self.view.setMaximumSize(self.view.minimumSizeHint())
+
     def update_game_ui(self):
         if self.session.stopped:
-            self.progress_timer.stop()
-            self.save_model()
-            if self.session.stop_reason:
-                self.view.set_status(self.session.stop_reason, 5000)
-            self.view.show_config()
-            if self.model.data["force_window_size"]:
-                self.view.setMinimumSize(self.view.minimumSizeHint())
-                self.view.setMaximumSize(self.view.minimumSizeHint())
+            self.handle_stop()
             return
 
         if self.session.track_limit:
