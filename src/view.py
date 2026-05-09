@@ -97,7 +97,7 @@ class SettingsTab(QWidget):
         super().__init__()
         layout = QVBoxLayout()
 
-        self.forced_window = QCheckBox("Force Window Size (Requires Restart)")
+        self.forced_window = QCheckBox("Force Window Size")
         self.auto_update = QCheckBox("Auto Update Banned Tracks")
         self.skip_skipped = QCheckBox("Don't Play Skipped Tracks")
 
@@ -134,7 +134,6 @@ class SettingsTab(QWidget):
         btn_delete.clicked.connect(self.delete_data_requested.emit)
         layout.addWidget(btn_delete)
 
-        # NOTE: get rid of this button? have other functions auto save
         btn_save = QPushButton("Save")
         btn_save.clicked.connect(self.save_requested.emit)
         layout.addWidget(btn_save)

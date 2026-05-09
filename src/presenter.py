@@ -98,9 +98,16 @@ class AppPresenter:
         if not silent:
             self.view.set_status("Saved!", 3000)
 
-    # TODO: change window size, so no restart required
     def handle_settings_changed(self, new_settings):
         self.model.data.update(new_settings)
+        if self.model.data["force_window_size"]:
+            hint = self.view.minimumSizeHint()
+            self.view.setFixedSize(hint)
+        else:
+            self.view.setMinimumSize(0, 0)
+            self.view.setMaximumSize(16777215, 16777215)
+            self.view.hide()
+            self.view.show()
 
     def handle_rescan_autosaves(self):
         self.view.set_status("Scanning...")
