@@ -1,12 +1,11 @@
 import copy
 import os
 import re
-import shutil
 from datetime import datetime, timedelta
 
 from PyQt6.QtCore import QThread, QTimer, pyqtSignal
 
-from common import values
+from common import default_data, values
 from model import BannedTracksFetcher, ConfigModel, GameSession
 from view import Dialogs, FindPath
 
@@ -35,7 +34,7 @@ class AppPresenter:
         if self.model.data.get("default_data"):
             self.model.data["default_data"] = False
             self.handle_preset_changed("Default")
-            self.save_model()
+            self.save_model(silent=True)
 
         if self.model.data.get("auto_update"):
             self.handle_banned_update()
@@ -91,11 +90,13 @@ class AppPresenter:
             self.model.data["game_rules"], self.model.data["track_rules"]
         )
 
-    def save_model(self):
-        self.view.set_status("Saving...")
+    def save_model(self, silent=False):
+        if not silent:
+            self.view.set_status("Saving...")
         self.model.save_data()
         self.model.save_autosaves()
-        self.view.set_status("Saved!", 3000)
+        if not silent:
+            self.view.set_status("Saved!", 3000)
 
     # TODO: change window size, so no restart required
     def handle_settings_changed(self, new_settings):
@@ -107,11 +108,32 @@ class AppPresenter:
         self.view.set_status(f"Found {total} replays!", 3000)
 
     def handle_delete_data(self):
-        if self.model.app_dir:
-            shutil.rmtree(self.model.app_dir, ignore_errors=True)
-            self.view.show_info(
-                "Deleted", "Data directory removed. Restart application."
-            )
+        reply = Dialogs.question(
+            self.view, "Delete Data", "Are you sure you want to delete all data?"
+        )
+        if not reply:
+            self.view.set_status("Canceled.", 3000)
+            return
+        files = [
+            "data.bin",
+            "autosaves.bin",
+            "log.log",
+            "TMUF_skipped.txt",
+            "TMNF_skipped.txt",
+            "TMO_skipped.txt",
+            "TMS_skipped.txt",
+            "TMN_skipped.txt",
+        ]
+        for file in files:
+            if os.path.exists(file):
+                os.remove(file)
+
+        self.model.data = copy.deepcopy(default_data)
+        self.model.data["default_data"] = False
+        self.handle_preset_changed("Default")
+        self.save_model(silent=True)
+        self.refresh_ui_from_model()
+        self.view.set_status("Deleted.", 3000)
 
     def handle_banned_clear(self):
         # NOTE: maybe have popup with warning?
@@ -192,7 +214,11 @@ class AppPresenter:
 
     def handle_new_preset(self, name: str):
         if name in self.model.data["presets"]:
-            rename = Dialogs.ask_for_rename(self.view, name)
+            rename = Dialogs.question(
+                self.view,
+                "Duplicate Preset Name",
+                f"Do you want to overwrite preset {name}",
+            )
             if not rename:
                 return
         self.model.data["presets"][name] = {
@@ -258,36 +284,6 @@ class AppPresenter:
                 track_rule[base_key]["text"] = val
                 track_rule[base_key]["value"] = opts.index(val) if val in opts else 0
 
-    def handle_find_exe(self):
-        exe_paths = self._find_executables()
-        if not exe_paths:
-            path = Dialogs.ask_for_exe(self.view)
-        else:
-            dialog = FindPath("exe_path", exe_paths)
-            if not dialog.exec():
-                return False  # window closed
-            if not dialog.path:
-                return False  # cancel
-            path = dialog.path
-        self.model.data["exe_path"] = path
-        self.view.settings_tab.populate(self.model.data)
-        return True
-
-    def handle_find_track(self):
-        track_paths = self._find_track_folders()
-        if not track_paths:
-            path = Dialogs.ask_for_track_dir(self.view)
-        else:
-            dialog = FindPath("track_dir", track_paths)
-            if not dialog.exec():
-                return False
-            if not dialog.path:
-                return False
-            path = dialog.path
-        self.model.data["track_dir"] = path
-        self.view.settings_tab.populate(self.model.data)
-        return True
-
     def _find_executables(self):
         steam = os.path.join("Steam", "steamapps", "common")
         tmuf = "TrackMania United"
@@ -314,6 +310,21 @@ class AppPresenter:
                 paths.update({path: name})
         return paths
 
+    def handle_find_exe(self):
+        exe_paths = self._find_executables()
+        if not exe_paths:
+            path = Dialogs.ask_for_exe(self.view)
+        else:
+            dialog = FindPath("exe_path", exe_paths)
+            if not dialog.exec():
+                return False  # window closed
+            if not dialog.path:
+                return False  # cancel
+            path = dialog.path
+        self.model.data["exe_path"] = path
+        self.view.settings_tab.populate(self.model.data)
+        return True
+
     def _find_track_folders(self):
         dir_paths = {
             os.path.join(
@@ -339,6 +350,21 @@ class AppPresenter:
             if os.path.exists(path):
                 paths.update({path: name})
         return paths
+
+    def handle_find_track(self):
+        track_paths = self._find_track_folders()
+        if not track_paths:
+            path = Dialogs.ask_for_track_dir(self.view)
+        else:
+            dialog = FindPath("track_dir", track_paths)
+            if not dialog.exec():
+                return False
+            if not dialog.path:
+                return False
+            path = dialog.path
+        self.model.data["track_dir"] = path
+        self.view.settings_tab.populate(self.model.data)
+        return True
 
     def generate_session_config(self):
         if not os.path.exists(self.model.data.get("exe_path", "")):
