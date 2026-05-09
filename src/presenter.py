@@ -387,7 +387,7 @@ class AppPresenter:
             if not os.path.exists(autosave_dir):
                 self.view.show_error(
                     "Invalid Path",
-                    f"The path {path} does not contain {os.path.join('Replays', 'Autosaves')}",
+                    f"The path {path} does not contain Replays/Autosaves",
                 )
             else:
                 break
