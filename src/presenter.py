@@ -330,7 +330,11 @@ class AppPresenter:
             if not path:
                 return False
 
-            if not os.path.isfile(path) or not os.access(path, os.X_OK):
+            if (
+                not os.path.isfile(path)
+                or not os.access(path, os.X_OK)
+                or os.path.splitext(path)[1] != ".exe"
+            ):
                 self.view.show_error(
                     "Invalid File", f"The file {path} is not an executable"
                 )
@@ -428,7 +432,7 @@ class AppPresenter:
     def handle_start_game(self):
         session_config = self.generate_session_config()
         if not session_config:
-            self.view.set_status("Canceled", 3000)
+            self.view.set_status("Canceled.", 3000)
             return
 
         self.view.game_tab.set_time_visible(
