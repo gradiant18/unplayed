@@ -39,9 +39,9 @@ class FindPath(QDialog):
         self.main_layout = QVBoxLayout()
 
         if path_type == "exe_path":
-            self.setWindowTitle("Select the executable you want to use")
-        else:
-            self.setWindowTitle("Select the Tracks directory")
+            self.setWindowTitle("Select an Exe")
+        elif path_type == "track_dir":
+            self.setWindowTitle("Select a Tracks Directory")
 
         self._display_paths()
         self.setLayout(self.main_layout)
@@ -70,12 +70,14 @@ class FindPath(QDialog):
     def _open_file_dialog(self):
         """Opens file dialog"""
         if self.path_type == "exe_path":
-            filepath = QFileDialog.getOpenFileName(self, "Select TmForever.exe")[0]
+            path = Dialogs.ask_for_exe(self)
+        elif self.path_type == "track_dir":
+            path = Dialogs.ask_for_track_dir(self)
         else:
-            filepath = QFileDialog.getExistingDirectory(self, "Select Tracks Directory")
+            return
 
-        if filepath:
-            self._return_path(filepath)
+        if path:
+            self._return_path(path)
 
     def _return_path(self, path=None):
         """Sets self.path and closes self"""
@@ -123,11 +125,7 @@ class SettingsTab(QWidget):
         paths_layout.addWidget(QLabel("Track Dir:"), 1, 0)
         paths_layout.addWidget(self.dir_edit, 1, 1)
         paths_layout.addWidget(btn_dir, 1, 2)
-        layout.addLayout(paths_layout)
 
-        # TODO: app_dir path and browse
-
-        # TODO: rescan autosaves button
         btn_scan = QPushButton("Rescan autosaves")
         btn_scan.clicked.connect(self.rescan_autosaves.emit)
         layout.addWidget(btn_scan)
@@ -605,10 +603,8 @@ class Dialogs:
         return path
 
     @staticmethod
-    def ask_for_rename(parent, preset):
-        reply = QMessageBox.question(
-            parent, "Duplicate Preset Name", f"Do you want to overwrite preset {preset}"
-        )
+    def question(parent, title, question):
+        reply = QMessageBox.question(parent, title, question)
         if reply == QMessageBox.StandardButton.Yes:
             return True
 
@@ -626,6 +622,7 @@ class MainWindow(QMainWindow):
         # NOTE: advanced options tab?
         # search author/track/trackpack by name
         # move some other settings here?
+
         self.tabs = QTabWidget()
         self.options_tab = OptionsTab()
         self.banned_tab = BannedTracksTab()

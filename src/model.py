@@ -22,35 +22,23 @@ from common import default_data, values
 
 
 class ConfigModel:
-    def __init__(self, version: str, save_here: str, no_launch: str):
+    def __init__(self, version: str, no_launch: str):
         self.version = version
         self.no_launch = no_launch
         self.data = copy.deepcopy(default_data)
 
-        if platform.system() == "Windows":
-            self.app_dir = os.path.join(str(os.getenv("APPDATA")), "unplayed")
-        elif platform.system() == "Linux":
-            self.app_dir = os.path.expanduser("~/.unplayed")
-        if save_here:
-            self.app_dir = "unplayed"
-
-        if not os.path.exists(self.app_dir):
-            os.mkdir(self.app_dir)
-
-        log_path = os.path.join(self.app_dir, "log.log")
-        open(log_path, "w").close()
+        open("log.log", "w").close()
 
         # PERF: start up performance?
         # self.update_autosave_data()
         self.load_data()
         self.test_data()
-        self.data["app_dir"] = self.app_dir
-        self.data["no_launch"] = self.no_launch
+        self.data["no_launch"] = no_launch
 
     def load_skipped(self) -> set:
         """Loads skipped tracks from file"""
         site = self.data["game_rules"].get("site")
-        path = os.path.join(self.app_dir, f"{site}_skipped.txt")
+        path = f"{site}_skipped.txt"
         if not os.path.exists(path):
             print(f"{path} doesn't exists, no skipped tracks")
             return set()
@@ -60,7 +48,7 @@ class ConfigModel:
 
     def save_skipped(self, site: str, skipped: set):
         """Saves skipped tracks to file"""
-        path = os.path.join(self.app_dir, f"{site}_skipped.txt")
+        path = f"{site}_skipped.txt"
         with open(path, "w") as file:
             for track_id in skipped:
                 file.write(f"https://{values[site]['url']}/trackshow/{track_id}\n")
@@ -81,7 +69,7 @@ class ConfigModel:
     def _load_autosave_data(self) -> dict:
         """Loads autosave data from file"""
         autosave_data = {"oldest": 0, "autosaves": set()}
-        path = os.path.join(self.app_dir, "autosaves.bin")
+        path = "autosaves.bin"
         if os.path.exists(path):
             with open(path, "rb") as file:
                 data = pickle.load(file)
@@ -124,14 +112,14 @@ class ConfigModel:
 
     def save_autosaves(self):
         """Saves autosave data to file"""
-        path = os.path.join(self.app_dir, "autosaves.bin")
+        path = "autosaves.bin"
         autosave_data = self.update_autosave_data()
         with open(path, "wb") as file:
             pickle.dump(autosave_data, file)
 
     def load_data(self):
         """Loads data from file"""
-        data_path = os.path.join(self.app_dir, "data.bin")
+        data_path = "data.bin"
         if os.path.exists(data_path):
             try:
                 with open(data_path, "rb") as file:
@@ -148,9 +136,7 @@ class ConfigModel:
 
     def save_data(self):
         """Saves data to file"""
-        if not os.path.exists(self.app_dir):
-            os.mkdir(self.app_dir)
-        data_path = os.path.join(self.app_dir, "data.bin")
+        data_path = "data.bin"
         with open(data_path, "wb") as file:
             pickle.dump(self.data, file)
 
@@ -165,11 +151,9 @@ class ConfigModel:
         if not os.path.exists(autosave_dir):
             return False
 
-        # app_dir
-
     def log(self, msg: str):
         """Saves msg to log file"""
-        log_path = os.path.join(self.app_dir, "log.log")
+        log_path = "log.log"
         with open(log_path, "a") as file:
             file.write(f"[{time.time()}] {msg}\n")
 
@@ -178,7 +162,7 @@ class Track:
     def __init__(self, track_data: dict):
         self.name = track_data["TrackName"]
         self.uid = track_data["UId"]
-        self.track_id = track_data["TrackId"]
+        self.id = track_data["TrackId"]
         self.path = ""
         self.medals = {
             "author": track_data["AuthorTime"],
@@ -227,11 +211,11 @@ class Track:
         unplayed_path = os.path.join(track_dir, "Challenges", "Unplayed", site)
         os.makedirs(unplayed_path, exist_ok=True)
 
-        self.path = os.path.join(unplayed_path, f"{self.track_id}.Challenge.gbx")
+        self.path = os.path.join(unplayed_path, f"{self.id}.Challenge.gbx")
         if os.path.exists(self.path):
             return
 
-        url = f"https://{values[site]['url']}/trackgbx/{self.track_id}"
+        url = f"https://{values[site]['url']}/trackgbx/{self.id}"
         for _ in range(3):
             try:
                 resp = requests.get(url, timeout=10)

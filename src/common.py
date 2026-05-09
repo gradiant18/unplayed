@@ -180,7 +180,6 @@ default_data = {
     "version": "2.0.0",
     "exe_path": "",
     "track_dir": "",
-    "app_dir": "",
     "force_window_size": True,
     "auto_update": False,
     "skip_skipped": True,
