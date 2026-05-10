@@ -143,11 +143,19 @@ class AppPresenter:
         self.view.set_status("Deleted.", 3000)
 
     def handle_banned_clear(self):
-        # NOTE: maybe have popup with warning?
+        reply = Dialogs.question(
+            self.view,
+            "Clear Banned Tracks",
+            "Are you sure you want to clear all banned tracks?",
+        )
+        if not reply:
+            self.view.set_status("Canceled.", 3000)
+            return
         self.model.data["banned_tracks"] = {
             site: set() for site in values["all"]["site"]
         }
         self.view.banned_tab.populate(self.model.data["banned_tracks"])
+        self.view.set_status("Cleared.", 3000)
 
     def handle_banned_update(self):
         self.view.set_status("Updating...")
