@@ -31,16 +31,30 @@ class AppPresenter:
         self.progress_timer = QTimer()
         self.progress_timer.timeout.connect(self.update_game_ui)
 
-        if self.model.data.get("default_data"):
-            self.model.data["default_data"] = False
-            self.handle_preset_changed("Default")
-            self.save_model(silent=True)
-
         if self.model.data.get("auto_update"):
             self.handle_banned_update()
 
         self.connect_signals()
-        self.refresh_ui_from_model()
+
+        if self.model.data.get("default_data"):
+            self.model.data["default_data"] = False
+            self.handle_preset_changed("Default")
+            self.view.options_tab.disable_delete_preset()
+            self.refresh_ui_from_model()
+            self.save_model(silent=True)
+        else:
+            self.refresh_ui_from_model()
+            game_rules = self.model.data["game_rules"]
+            track_rules = self.model.data["track_rules"]
+            preset = self.model.data["preset"]
+            if (
+                game_rules != self.model.data["presets"][preset]["game_rules"]
+                or track_rules != self.model.data["presets"][preset]["track_rules"]
+            ):
+                presets = list(self.model.data["presets"].keys())
+                presets.append("---")
+                self.view.options_tab.populate_presets(presets, "---")
+                self.view.options_tab.deselected_preset()
 
     def connect_signals(self):
         self.view.settings_tab.settings_changed.connect(self.handle_settings_changed)
@@ -71,8 +85,6 @@ class AppPresenter:
         self.view.game_tab.stop_requested.connect(lambda: self.session.stop())
 
     def refresh_ui_from_model(self):
-        # NOTE: on startup, if options are different than last loaded preset,
-        # maybe set preset text to ---
         if self.model.data["force_window_size"]:
             self.view.setMinimumSize(self.view.minimumSizeHint())
             self.view.setMaximumSize(self.view.minimumSizeHint())
@@ -84,11 +96,10 @@ class AppPresenter:
             list(self.model.data["presets"].keys()), self.model.data["preset"]
         )
 
-        site = self.model.data["game_rules"]["site"]
-        self.view.options_tab.update_comboboxes(site)
-        self.view.options_tab.populate_rules(
-            self.model.data["game_rules"], self.model.data["track_rules"]
-        )
+        game_rules = self.model.data["game_rules"]
+        track_rules = self.model.data["track_rules"]
+        self.view.options_tab.update_comboboxes(game_rules["site"])
+        self.view.options_tab.populate_rules(game_rules, track_rules)
 
     def save_model(self, silent=False):
         if not silent:
@@ -211,11 +222,14 @@ class AppPresenter:
 
     def handle_preset_changed(self, name: str):
         if name and name in self.model.data["presets"]:
+            self.view.options_tab.selected_preset()
             self.model.data["preset"] = name
             preset = self.model.data["presets"][name]
             self.model.data["game_rules"] = copy.deepcopy(preset["game_rules"])
             self.model.data["track_rules"] = copy.deepcopy(preset["track_rules"])
             self.refresh_ui_from_model()
+            if len(self.model.data["presets"]) <= 1:
+                self.view.options_tab.disable_delete_preset()
 
     def handle_save_preset(self):
         name = self.model.data["preset"]
@@ -225,7 +239,8 @@ class AppPresenter:
         self.model.data["presets"][name]["track_rules"] = copy.deepcopy(
             self.model.data["track_rules"]
         )
-        self.save_model()
+        self.save_model(silent=True)
+        self.view.set_status(f"{name} saved!", 3000)
 
     def handle_new_preset(self, name: str):
         if name in self.model.data["presets"]:
@@ -236,6 +251,7 @@ class AppPresenter:
             )
             if not rename:
                 return
+
         self.model.data["presets"][name] = {
             "game_rules": copy.deepcopy(self.model.data["game_rules"]),
             "track_rules": copy.deepcopy(self.model.data["track_rules"]),
@@ -244,18 +260,32 @@ class AppPresenter:
         self.view.options_tab.populate_presets(
             list(self.model.data["presets"].keys()), name
         )
-        self.save_model()
+        self.view.options_tab.selected_preset()
+        self.view.options_tab.enable_delete_preset()
+        self.save_model(silent=True)
+        self.view.set_status(f"Preset {name} saved!", 3000)
 
-    # NOTE: change to first preset or keep options?
-    # doesn't preserve current options right now
     def handle_delete_preset(self):
         name = self.model.data["preset"]
         if len(self.model.data["presets"]) <= 1:
             return
+        reply = Dialogs.question(
+            self.view,
+            "Delete Preset",
+            f"Are you sure you want to delete preset {name}?",
+        )
+        if not reply:
+            return
         del self.model.data["presets"][name]
-        new_name = list(self.model.data["presets"].keys())[0]
-        self.handle_preset_changed(new_name)
-        self.save_model()
+        presets = list(self.model.data["presets"].keys())
+        presets.append("---")
+        self.view.options_tab.populate_presets(presets, "---")
+        self.view.options_tab.deselected_preset()
+        self.model.data["preset"] = presets[0]
+        self.save_model(silent=True)
+        self.view.set_status(f"{name} deleted.", 3000)
+        if len(self.model.data["presets"]) <= 1:
+            self.view.options_tab.disable_delete_preset()
 
     def handle_game_rule_changed(self, key, val):
         gr = self.model.data["game_rules"]
@@ -284,7 +314,7 @@ class AppPresenter:
         if key.endswith("_state"):
             track_rule[base_key]["state"] = 2 if val else 0
         else:
-            if "time" in base_key:
+            if "time" in base_key and "author" not in base_key:
                 track_rule[base_key]["value"] = val.msecsSinceStartOfDay()
             elif "uploaded" in base_key:
                 track_rule[base_key]["value"] = datetime.fromtimestamp(
@@ -495,7 +525,7 @@ class AppPresenter:
                 if self.session.mode == "wr"
                 else current.medals.get(self.session.mode)
             )
-            info = f"{current.name} | {current.track_id}" + (
+            info = f"{current.name} | {current.id}" + (
                 f" | {targ / 1000}s" if targ else ""
             )
             self.view.game_tab.set_info(info)

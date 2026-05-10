@@ -260,16 +260,16 @@ class OptionsTab(QWidget):
         preset_layout = QHBoxLayout()
         self.preset_combo = QComboBox()
         self.preset_combo.currentTextChanged.connect(self.preset_changed.emit)
-        btn_save = QPushButton("Save")
-        btn_save.clicked.connect(self.save_preset_requested.emit)
+        self.btn_save_preset = QPushButton("Save")
+        self.btn_save_preset.clicked.connect(self.save_preset_requested.emit)
         btn_new = QPushButton("Save As")
         btn_new.clicked.connect(self._trigger_new_preset)
-        btn_del = QPushButton("Delete")
-        btn_del.clicked.connect(self.delete_preset_requested.emit)
+        self.btn_del_preset = QPushButton("Delete")
+        self.btn_del_preset.clicked.connect(self.delete_preset_requested.emit)
         preset_layout.addWidget(self.preset_combo)
-        preset_layout.addWidget(btn_save)
+        preset_layout.addWidget(self.btn_save_preset)
         preset_layout.addWidget(btn_new)
-        preset_layout.addWidget(btn_del)
+        preset_layout.addWidget(self.btn_del_preset)
         layout.addLayout(preset_layout)
 
         # Game Rules
@@ -430,9 +430,24 @@ class OptionsTab(QWidget):
             self.track_rule_changed.emit(f"{key}_state", state == 2)
 
     def _trigger_new_preset(self):
-        text, ok = QInputDialog.getText(self, "New Preset", "Name:")
-        if ok and text:
-            self.new_preset_requested.emit(text)
+        while True:
+            preset_name, ok = QInputDialog.getText(
+                self, "New Preset", "Name your new preset:"
+            )
+            if not ok:
+                return
+            if preset_name == "":
+                QMessageBox.warning(
+                    self, "Empty Preset Name", "Please give your preset a name."
+                )
+                continue
+            if preset_name == "---":
+                QMessageBox.warning(
+                    self, "Invalid Preset Name", "--- is an invalid preset name."
+                )
+                continue
+            break
+        self.new_preset_requested.emit(preset_name)
 
     def populate_presets(self, presets: list, current: str):
         """Populates list of presets"""
@@ -522,6 +537,21 @@ class OptionsTab(QWidget):
 
             chk.blockSignals(False)
             wdg.blockSignals(False)
+
+    def deselected_preset(self):
+        self.btn_save_preset.setEnabled(False)
+        self.preset_combo.setCurrentText("---")
+        self.btn_del_preset.setEnabled(False)
+
+    def selected_preset(self):
+        self.btn_save_preset.setEnabled(True)
+        self.btn_del_preset.setEnabled(True)
+
+    def disable_delete_preset(self):
+        self.btn_del_preset.setEnabled(False)
+
+    def enable_delete_preset(self):
+        self.btn_del_preset.setEnabled(True)
 
 
 class GameTab(QWidget):

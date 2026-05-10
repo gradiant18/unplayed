@@ -29,8 +29,7 @@ class ConfigModel:
 
         open("log.log", "w").close()
 
-        # PERF: start up performance?
-        # self.update_autosave_data()
+        self.update_autosave_data()
         self.load_data()
         self.data["no_launch"] = no_launch
 
@@ -39,7 +38,6 @@ class ConfigModel:
         site = self.data["game_rules"].get("site")
         path = f"{site}_skipped.txt"
         if not os.path.exists(path):
-            print(f"{path} doesn't exists, no skipped tracks")
             return set()
         with open(path) as file:
             data = file.read()
@@ -49,8 +47,8 @@ class ConfigModel:
         """Saves skipped tracks to file"""
         path = f"{site}_skipped.txt"
         with open(path, "w") as file:
-            for track_id in skipped:
-                file.write(f"https://{values[site]['url']}/trackshow/{track_id}\n")
+            for id in skipped:
+                file.write(f"https://{values[site]['url']}/trackshow/{id}\n")
 
     def _get_uid(self, path: str) -> str | None:
         """Gets UID for path"""
@@ -184,11 +182,6 @@ class Track:
 
     def load(self, exe_path: str, id: int):
         """Loads track in game"""
-        print(
-            exe_path,
-            id,
-            self.path,
-        )
         cmd = [exe_path, "/singleinst", "/useexedir", f"/file={self.path}"]
         if platform.system() != "Windows":
             cmd = ["protontricks-launch", "--appid", id] + cmd
@@ -312,7 +305,7 @@ class GameSession:
     def skip(self):
         """Skips current track and goes to the next track"""
         if self.session_config.get("skip_skipped") and self.current:
-            self.skipped.add(self.current.track_id)
+            self.skipped.add(self.current.id)
         self.go_next = True
 
     def reload(self):
