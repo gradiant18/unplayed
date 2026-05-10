@@ -125,6 +125,7 @@ class SettingsTab(QWidget):
         paths_layout.addWidget(QLabel("Track Dir:"), 1, 0)
         paths_layout.addWidget(self.dir_edit, 1, 1)
         paths_layout.addWidget(btn_dir, 1, 2)
+        layout.addLayout(paths_layout)
 
         btn_scan = QPushButton("Rescan autosaves")
         btn_scan.clicked.connect(self.rescan_autosaves.emit)

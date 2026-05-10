@@ -32,7 +32,6 @@ class ConfigModel:
         # PERF: start up performance?
         # self.update_autosave_data()
         self.load_data()
-        self.test_data()
         self.data["no_launch"] = no_launch
 
     def load_skipped(self) -> set:
@@ -139,17 +138,6 @@ class ConfigModel:
         data_path = "data.bin"
         with open(data_path, "wb") as file:
             pickle.dump(self.data, file)
-
-    def test_data(self):
-        """Verifies data paths"""
-        # TODO: add tests to check file paths
-
-        # exe_path
-
-        # track_dir
-        autosave_dir = os.path.join(self.data["track_dir"], "Replays", "Autosaves")
-        if not os.path.exists(autosave_dir):
-            return False
 
     def log(self, msg: str):
         """Saves msg to log file"""

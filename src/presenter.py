@@ -319,15 +319,27 @@ class AppPresenter:
 
     def handle_find_exe(self):
         exe_paths = self._find_executables()
-        if not exe_paths:
-            path = Dialogs.ask_for_exe(self.view)
-        else:
-            dialog = FindPath("exe_path", exe_paths)
-            if not dialog.exec():
-                return False  # window closed
-            if not dialog.path:
-                return False  # cancel
-            path = dialog.path
+        while True:
+            if not exe_paths:
+                path = Dialogs.ask_for_exe(self.view)
+            else:
+                dialog = FindPath("exe_path", exe_paths)
+                if not dialog.exec():
+                    return False  # window closed
+                path = dialog.path
+            if not path:
+                return False
+
+            if (
+                not os.path.isfile(path)
+                or not os.access(path, os.X_OK)
+                or os.path.splitext(path)[1] != ".exe"
+            ):
+                self.view.show_error(
+                    "Invalid File", f"The file {path} is not an executable"
+                )
+            else:
+                break
         self.model.data["exe_path"] = path
         self.view.settings_tab.populate(self.model.data)
         return True
@@ -360,15 +372,26 @@ class AppPresenter:
 
     def handle_find_track(self):
         track_paths = self._find_track_folders()
-        if not track_paths:
-            path = Dialogs.ask_for_track_dir(self.view)
-        else:
-            dialog = FindPath("track_dir", track_paths)
-            if not dialog.exec():
+        while True:
+            if not track_paths:
+                path = Dialogs.ask_for_track_dir(self.view)
+            else:
+                dialog = FindPath("track_dir", track_paths)
+                if not dialog.exec():
+                    return False
+                path = dialog.path
+            if not path:
                 return False
-            if not dialog.path:
-                return False
-            path = dialog.path
+
+            autosave_dir = os.path.join(path, "Replays", "Autosaves")
+            if not os.path.exists(autosave_dir):
+                self.view.show_error(
+                    "Invalid Path",
+                    f"The path {path} does not contain Replays/Autosaves",
+                )
+            else:
+                break
+
         self.model.data["track_dir"] = path
         self.view.settings_tab.populate(self.model.data)
         return True
@@ -409,7 +432,7 @@ class AppPresenter:
     def handle_start_game(self):
         session_config = self.generate_session_config()
         if not session_config:
-            self.view.set_status("Canceled", 3000)
+            self.view.set_status("Canceled.", 3000)
             return
 
         self.view.game_tab.set_time_visible(
