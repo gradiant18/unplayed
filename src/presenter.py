@@ -71,14 +71,14 @@ class AppPresenter:
         self.view.banned_tab.export_requested.connect(self.handle_banned_export)
         self.view.banned_tab.import_requested.connect(self.handle_banned_import)
 
-        self.view.options_tab.save_requested.connect(self.save_model)
-        self.view.options_tab.start_requested.connect(self.handle_start_game)
         self.view.options_tab.preset_changed.connect(self.handle_preset_changed)
         self.view.options_tab.save_preset_requested.connect(self.handle_save_preset)
         self.view.options_tab.new_preset_requested.connect(self.handle_new_preset)
         self.view.options_tab.delete_preset_requested.connect(self.handle_delete_preset)
         self.view.options_tab.game_rule_changed.connect(self.handle_game_rule_changed)
         self.view.options_tab.track_rule_changed.connect(self.handle_track_rule_changed)
+        self.view.options_tab.start_requested.connect(self.handle_start_game)
+        self.view.options_tab.save_requested.connect(self.save_model)
 
         self.view.game_tab.skip_requested.connect(lambda: self.session.skip())
         self.view.game_tab.reload_requested.connect(lambda: self.session.reload())
@@ -119,6 +119,104 @@ class AppPresenter:
             self.view.setMaximumSize(16777215, 16777215)
             self.view.hide()
             self.view.show()
+
+    def handle_find_exe(self):
+        steam = os.path.join("Steam", "steamapps", "common")
+        tmuf = "TrackMania United"
+        tmnf = "TrackMania Nations Forever"
+        exe = "TmForever.exe"
+
+        steam_paths = {
+            os.path.join(str(os.getenv("ProgramFiles")), steam, tmuf, exe): "TMUF",
+            os.path.join(str(os.getenv("ProgramFiles")), steam, tmnf, exe): "TMNF",
+            os.path.join(str(os.getenv("ProgramFiles(x86)")), steam, tmuf, exe): "TMUF",
+            os.path.join(str(os.getenv("ProgramFiles(x86)")), steam, tmnf, exe): "TMNF",
+            os.path.expanduser(
+                f"~/.local/share/Steam/steamapps/common/{tmuf}/{exe}"
+            ): "TMUF",
+            os.path.expanduser(
+                f"~/.local/share/Steam/steamapps/common/{tmnf}/{exe}"
+            ): "TMNF",
+        }
+
+        exe_paths = {}
+        for path, name in steam_paths.items():
+            if os.path.exists(path):
+                exe_paths.update({path: name})
+
+        while True:
+            if not exe_paths:
+                path = Dialogs.ask_for_exe(self.view)
+            else:
+                dialog = FindPath("exe_path", exe_paths)
+                if not dialog.exec():
+                    return False  # window closed
+                path = dialog.path
+            if not path:
+                return False
+
+            if (
+                not os.path.isfile(path)
+                or not os.access(path, os.X_OK)
+                or os.path.splitext(path)[1] != ".exe"
+            ):
+                self.view.show_error(
+                    "Invalid File", f"The file {path} is not an executable"
+                )
+            else:
+                break
+        self.model.data["exe_path"] = path
+        self.view.settings_tab.populate(self.model.data)
+        return True
+
+    def handle_find_track(self):
+        dir_paths = {
+            os.path.join(
+                str(os.getenv("HOMEPATH")), "Documents", "TrackMania", "Tracks"
+            ): "Select",
+            os.path.join(
+                str(os.getenv("HOMEPATH")),
+                "OneDrive",
+                "Documents",
+                "TrackMania",
+                "Tracks",
+            ): "Select",
+            os.path.expanduser(
+                "~/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks"
+            ): "TMUF",
+            os.path.expanduser(
+                "~/.local/share/Steam/steamapps/compatdata/11020/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks"
+            ): "TMNF",
+        }
+
+        track_paths = {}
+        for path, name in dir_paths.items():
+            if os.path.exists(path):
+                track_paths.update({path: name})
+
+        while True:
+            if not track_paths:
+                path = Dialogs.ask_for_track_dir(self.view)
+            else:
+                dialog = FindPath("track_dir", track_paths)
+                if not dialog.exec():
+                    return False
+                path = dialog.path
+            if not path:
+                return False
+
+            autosave_dir = os.path.join(path, "Replays", "Autosaves")
+            if not os.path.exists(autosave_dir):
+                self.view.show_error(
+                    "Invalid Path",
+                    f"The path {path} does not contain Replays/Autosaves",
+                )
+            else:
+                break
+
+        self.model.data["track_dir"] = path
+        self.view.settings_tab.populate(self.model.data)
+        return True
 
     def handle_rescan_autosaves(self):
         self.view.set_status("Scanning...")
@@ -329,110 +427,33 @@ class AppPresenter:
                 track_rule[base_key]["text"] = val
                 track_rule[base_key]["value"] = opts.index(val) if val in opts else 0
 
-    def _find_executables(self):
-        steam = os.path.join("Steam", "steamapps", "common")
-        tmuf = "TrackMania United"
-        tmnf = "TrackMania Nations Forever"
-        exe = "TmForever.exe"
+    def handle_start_game(self):
+        session_config = self.generate_session_config()
+        if not session_config:
+            self.view.set_status("Canceled.", 3000)
+            return
 
-        steam_paths = {
-            os.path.join(str(os.getenv("ProgramFiles")), steam, tmuf, exe): "TMUF",
-            os.path.join(str(os.getenv("ProgramFiles")), steam, tmnf, exe): "TMNF",
-            os.path.join(str(os.getenv("ProgramFiles(x86)")), steam, tmuf, exe): "TMUF",
-            os.path.join(str(os.getenv("ProgramFiles(x86)")), steam, tmnf, exe): "TMNF",
-            os.path.join(str(os.getenv("ProgramFiles(x86)")), steam, tmuf, exe): "TMUF",
-            os.path.expanduser(
-                f"~/.local/share/Steam/steamapps/common/{tmuf}/{exe}"
-            ): "TMUF",
-            os.path.expanduser(
-                f"~/.local/share/Steam/steamapps/common/{tmnf}/{exe}"
-            ): "TMNF",
-        }
+        self.view.game_tab.set_time_visible(
+            bool(session_config["game_rules"]["time_limit"])
+        )
 
-        paths = {}
-        for path, name in steam_paths.items():
-            if os.path.exists(path):
-                paths.update({path: name})
-        return paths
+        self.session.start(session_config)
+        self.progress_timer.start(100)
+        self.view.show_game()
+        if self.model.data["force_window_size"]:
+            self.view.setMinimumHeight(220)
+            self.view.setMaximumHeight(220)
 
-    def handle_find_exe(self):
-        exe_paths = self._find_executables()
-        while True:
-            if not exe_paths:
-                path = Dialogs.ask_for_exe(self.view)
-            else:
-                dialog = FindPath("exe_path", exe_paths)
-                if not dialog.exec():
-                    return False  # window closed
-                path = dialog.path
-            if not path:
-                return False
-
-            if (
-                not os.path.isfile(path)
-                or not os.access(path, os.X_OK)
-                or os.path.splitext(path)[1] != ".exe"
-            ):
-                self.view.show_error(
-                    "Invalid File", f"The file {path} is not an executable"
-                )
-            else:
-                break
-        self.model.data["exe_path"] = path
-        self.view.settings_tab.populate(self.model.data)
-        return True
-
-    def _find_track_folders(self):
-        dir_paths = {
-            os.path.join(
-                str(os.getenv("HOMEPATH")), "Documents", "TrackMania", "Tracks"
-            ): "Select",
-            os.path.join(
-                str(os.getenv("HOMEPATH")),
-                "OneDrive",
-                "Documents",
-                "TrackMania",
-                "Tracks",
-            ): "Select",
-            os.path.expanduser(
-                "~/.local/share/Steam/steamapps/compatdata/7200/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks"
-            ): "TMUF",
-            os.path.expanduser(
-                "~/.local/share/Steam/steamapps/compatdata/11020/pfx/drive_c/users/steamuser/Documents/TrackMania/Tracks"
-            ): "TMNF",
-        }
-
-        paths = {}
-        for path, name in dir_paths.items():
-            if os.path.exists(path):
-                paths.update({path: name})
-        return paths
-
-    def handle_find_track(self):
-        track_paths = self._find_track_folders()
-        while True:
-            if not track_paths:
-                path = Dialogs.ask_for_track_dir(self.view)
-            else:
-                dialog = FindPath("track_dir", track_paths)
-                if not dialog.exec():
-                    return False
-                path = dialog.path
-            if not path:
-                return False
-
-            autosave_dir = os.path.join(path, "Replays", "Autosaves")
-            if not os.path.exists(autosave_dir):
-                self.view.show_error(
-                    "Invalid Path",
-                    f"The path {path} does not contain Replays/Autosaves",
-                )
-            else:
-                break
-
-        self.model.data["track_dir"] = path
-        self.view.settings_tab.populate(self.model.data)
-        return True
+    def handle_stop(self):
+        self.progress_timer.stop()
+        self.save_model()
+        self.model.save_skipped(self.session.site, self.session.skipped)
+        if self.session.stop_reason:
+            self.view.set_status(self.session.stop_reason, 5000)
+        self.view.show_config()
+        if self.model.data["force_window_size"]:
+            self.view.setMinimumSize(self.view.minimumSizeHint())
+            self.view.setMaximumSize(self.view.minimumSizeHint())
 
     def generate_session_config(self):
         if not os.path.exists(self.model.data.get("exe_path", "")):
@@ -466,34 +487,6 @@ class AppPresenter:
         config["autosaves"] = autosave_data.get("autosaves", set())
         config["skipped"] = self.model.load_skipped()
         return config
-
-    def handle_start_game(self):
-        session_config = self.generate_session_config()
-        if not session_config:
-            self.view.set_status("Canceled.", 3000)
-            return
-
-        self.view.game_tab.set_time_visible(
-            bool(session_config["game_rules"]["time_limit"])
-        )
-
-        self.session.start(session_config)
-        self.progress_timer.start(100)
-        self.view.show_game()
-        if self.model.data["force_window_size"]:
-            self.view.setMinimumHeight(220)
-            self.view.setMaximumHeight(220)
-
-    def handle_stop(self):
-        self.progress_timer.stop()
-        self.save_model()
-        self.model.save_skipped(self.session.site, self.session.skipped)
-        if self.session.stop_reason:
-            self.view.set_status(self.session.stop_reason, 5000)
-        self.view.show_config()
-        if self.model.data["force_window_size"]:
-            self.view.setMinimumSize(self.view.minimumSizeHint())
-            self.view.setMaximumSize(self.view.minimumSizeHint())
 
     def update_game_ui(self):
         if self.session.stopped:
