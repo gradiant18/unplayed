@@ -9,7 +9,7 @@ import subprocess
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import datetime, timedelta
 from io import StringIO
 from queue import Empty, Full, Queue
 
@@ -233,6 +233,7 @@ class GameSession:
         self.stopped = False
         self.stop_time = None
         self.stop_reason = None
+        self.paused_event = threading.Event()
 
         self.id = 0
 
@@ -301,6 +302,7 @@ class GameSession:
             self.observer = None
 
         self.stopped = True
+        self.paused_event.clear()
 
     def skip(self):
         """Skips current track and goes to the next track"""
@@ -311,11 +313,21 @@ class GameSession:
     def reload(self):
         """Reloads current track"""
         time.sleep(0.5)
-        if self.current:
+        if self.current and not self.session_config.get("no_launch"):
             self.current.load(self.session_config["exe_path"], self.id)
+
+    def pause(self):
+        """Toggles the pause state"""
+        if not self.paused_event.is_set():
+            self.paused_event.set()
+            return True
+        self.paused_event.clear()
 
     def new_autosave(self, replay_path: str):
         """Determines if replay is the right track and fast enough"""
+        if self.paused_event.is_set():
+            return
+
         replay_uid = self._get_uid(replay_path)
         if not self.current or self.current.uid != replay_uid:
             return
@@ -344,6 +356,12 @@ class GameSession:
     def _daemon_main(self):
         """Loads tracks and checks for stops"""
         while not self.stop_session:
+            if self.paused_event.is_set():
+                if self.stop_time:
+                    self.stop_time += timedelta(seconds=1)
+                time.sleep(1)
+                continue
+
             if self.track_limit and len(self.finished) >= self.track_limit:
                 self.config_model.log("[STOP] Track limit reached")
                 self.stop("Track Limit Reached")
