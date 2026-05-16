@@ -83,7 +83,6 @@ class AppPresenter:
         self.view.game_tab.skip_requested.connect(lambda: self.session.skip())
         self.view.game_tab.reload_requested.connect(lambda: self.session.reload())
         self.view.game_tab.stop_requested.connect(lambda: self.session.stop())
-        self.view.game_tab.pause_requested.connect(self.handle_pause)
 
     def refresh_ui_from_model(self):
         if self.model.data["force_window_size"]:
@@ -447,7 +446,6 @@ class AppPresenter:
 
     def handle_stop(self):
         self.progress_timer.stop()
-        self.view.game_tab.unpause()
         self.save_model()
         self.model.save_skipped(self.session.site, self.session.skipped)
         if self.session.stop_reason:
@@ -456,13 +454,6 @@ class AppPresenter:
         if self.model.data["force_window_size"]:
             self.view.setMinimumSize(self.view.minimumSizeHint())
             self.view.setMaximumSize(self.view.minimumSizeHint())
-
-    def handle_pause(self):
-        paused = self.session.pause()
-        if paused:
-            self.view.game_tab.pause()
-        else:
-            self.view.game_tab.unpause()
 
     def generate_session_config(self):
         if not os.path.exists(self.model.data.get("exe_path", "")):
@@ -500,9 +491,6 @@ class AppPresenter:
     def update_game_ui(self):
         if self.session.stopped:
             self.handle_stop()
-            return
-
-        if self.session.paused_event.is_set():
             return
 
         if self.session.track_limit:

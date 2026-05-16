@@ -558,7 +558,6 @@ class GameTab(QWidget):
     skip_requested = pyqtSignal()
     reload_requested = pyqtSignal()
     stop_requested = pyqtSignal()
-    pause_requested = pyqtSignal()
 
     def __init__(self):
         super().__init__()
@@ -582,30 +581,18 @@ class GameTab(QWidget):
         self.track_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         btn_layout = QHBoxLayout()
-        self.btn_rel = QPushButton("Reload")
-        self.btn_rel.setStyleSheet(
-            "QPushButton {background-color: yellow; color: black;}"
-        )
-        self.btn_rel.clicked.connect(self.reload_requested.emit)
-        self.btn_skip = QPushButton("Skip")
-        self.btn_skip.setStyleSheet(
-            "QPushButton {background-color: orange; color: black;}"
-        )
-        self.btn_skip.clicked.connect(self.skip_requested.emit)
-        self.btn_stop = QPushButton("Stop")
-        self.btn_stop.setStyleSheet(
-            "QPushButton {background-color: red; color: black;}"
-        )
-        self.btn_stop.clicked.connect(self.stop_requested.emit)
-        self.btn_pause = QPushButton("Pause")
-        self.btn_pause.setStyleSheet(
-            "QPushButton {background-color: teal; color: black;}"
-        )
-        self.btn_pause.clicked.connect(self.pause_requested.emit)
-        btn_layout.addWidget(self.btn_rel)
-        btn_layout.addWidget(self.btn_skip)
-        btn_layout.addWidget(self.btn_stop)
-        btn_layout.addWidget(self.btn_pause)
+        btn_rel = QPushButton("Reload")
+        btn_rel.setStyleSheet("background-color: yellow")
+        btn_rel.clicked.connect(self.reload_requested.emit)
+        btn_skip = QPushButton("Skip")
+        btn_skip.setStyleSheet("background-color: orange")
+        btn_skip.clicked.connect(self.skip_requested.emit)
+        btn_stop = QPushButton("Stop")
+        btn_stop.setStyleSheet("background-color: red")
+        btn_stop.clicked.connect(self.stop_requested.emit)
+        btn_layout.addWidget(btn_rel)
+        btn_layout.addWidget(btn_skip)
+        btn_layout.addWidget(btn_stop)
 
         layout.addWidget(frame)
         layout.addWidget(self.time_frame)
@@ -632,24 +619,6 @@ class GameTab(QWidget):
 
     def set_info(self, text: str):
         self.track_info.setText(text)
-
-    def pause(self):
-        self.btn_rel.setEnabled(False)
-        self.btn_rel.setStyleSheet("color: black")
-        self.btn_skip.setEnabled(False)
-        self.btn_skip.setStyleSheet("color: black")
-        self.btn_pause.setText("Unpause")
-
-    def unpause(self):
-        self.btn_rel.setEnabled(True)
-        self.btn_rel.setStyleSheet(
-            "QPushButton {background-color: yellow; color: black;}"
-        )
-        self.btn_skip.setEnabled(True)
-        self.btn_skip.setStyleSheet(
-            "QPushButton {background-color: orange; color: black;}"
-        )
-        self.btn_pause.setText("Pause")
 
 
 class Dialogs:
