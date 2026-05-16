@@ -311,7 +311,7 @@ class GameSession:
     def reload(self):
         """Reloads current track"""
         time.sleep(0.5)
-        if self.current:
+        if self.current and not self.session_config.get("no_launch"):
             self.current.load(self.session_config["exe_path"], self.id)
 
     def new_autosave(self, replay_path: str):
