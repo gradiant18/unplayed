@@ -228,7 +228,7 @@ class GameSession:
 
         self.current = None
         self.go_next = False
-        self.fetching_done = False
+        self.fetched = False
         self.stop_session = False
         self.stopped = False
         self.stop_time = None
@@ -246,7 +246,7 @@ class GameSession:
         self.skipped = self.session_config["skipped"]
 
         self.go_next = False
-        self.fetching_done = False
+        self.fetched = False
         self.stop_session = False
         self.stopped = False
         self.stop_reason = None
@@ -271,12 +271,12 @@ class GameSession:
         threading.Thread(target=self._daemon_get_tracks, daemon=True).start()
 
         # Wait for tracks
-        while not self.tracks and not self.fetching_done:
+        while not self.fetched:
             time.sleep(0.1)
 
         if not self.tracks:
             self.stop("No Tracks Found")
-            return
+            return False
 
         if not self.track_limit:
             self.track_limit = len(self.tracks)
@@ -290,6 +290,7 @@ class GameSession:
         )
         self.observer.schedule(ReplayHandler(self), path=autosave_dir, recursive=False)
         self.observer.start()
+        return True
 
     def stop(self, reason=""):
         """Stops game session"""
@@ -306,6 +307,11 @@ class GameSession:
         """Skips current track and goes to the next track"""
         if self.session_config.get("skip_skipped") and self.current:
             self.skipped.add(self.current.id)
+        if self.track_limit == self.fetched:
+            self.track_limit -= 1
+            self.fetched -= 1
+            if self.track_limit <= 0:
+                self.stop("No Tracks Left")
         self.go_next = True
 
     def reload(self):
@@ -415,7 +421,7 @@ class GameSession:
                     retries += 1
                     time.sleep(1)
 
-        self.fetching_done = True
+        self.fetched = len(self.tracks) if self.tracks else True
 
     def _daemon_downloader(self):
         """Gets and downloads tracks for playing queue"""
