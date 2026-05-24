@@ -437,12 +437,13 @@ class AppPresenter:
             bool(session_config["game_rules"]["time_limit"])
         )
 
-        self.session.start(session_config)
+        started = self.session.start(session_config)
         self.progress_timer.start(100)
-        self.view.show_game()
-        if self.model.data["force_window_size"]:
-            self.view.setMinimumHeight(220)
-            self.view.setMaximumHeight(220)
+        if started:
+            self.view.show_game()
+            if self.model.data["force_window_size"]:
+                self.view.setMinimumHeight(220)
+                self.view.setMaximumHeight(220)
 
     def handle_stop(self):
         self.progress_timer.stop()
