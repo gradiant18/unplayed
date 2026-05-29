@@ -183,6 +183,7 @@ default_data = {
     "force_window_size": True,
     "auto_update": False,
     "skip_skipped": True,
+    "uid_clash": False,
     "default_data": True,
     "game_rules": {},
     "track_rules": {},

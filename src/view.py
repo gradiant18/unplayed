@@ -1,4 +1,5 @@
 import re
+import webbrowser
 
 from PyQt6.QtCore import QDateTime, Qt, QTime, pyqtSignal
 from PyQt6.QtWidgets import (
@@ -27,7 +28,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from common import values
+from common import values, default_data
 
 
 class FindPath(QDialog):
@@ -85,6 +86,28 @@ class FindPath(QDialog):
         self.accept()
 
 
+class UidClash(QDialog):
+    def __init__(self, clashes: dict, site_url: str):
+        super().__init__()
+        main_layout = QVBoxLayout()
+        self.setWindowTitle("UID Clashes")
+
+        for uid, ids in clashes.items():
+            row = QHBoxLayout()
+            row.addWidget(QLabel(f"{uid} -> "))
+            for id in ids:
+                btn = QPushButton(str(id))
+                url = f"https://{site_url}/trackshow/{id}"
+                btn.clicked.connect(lambda _, url=url: self._open_url(url))
+                row.addWidget(btn)
+            main_layout.addLayout(row)
+
+        self.setLayout(main_layout)
+
+    def _open_url(self, url: str):
+        webbrowser.open(url)
+
+
 class SettingsTab(QWidget):
     settings_changed = pyqtSignal(dict)
     delete_data_requested = pyqtSignal()
@@ -100,8 +123,14 @@ class SettingsTab(QWidget):
         self.forced_window = QCheckBox("Force Window Size")
         self.auto_update = QCheckBox("Auto Update Banned Tracks")
         self.skip_skipped = QCheckBox("Don't Play Skipped Tracks")
+        self.uid_clash = QCheckBox("Detect UID Clashes")
 
-        self.checkboxes = [self.forced_window, self.auto_update, self.skip_skipped]
+        self.checkboxes = {
+            self.forced_window: "force_window_size",
+            self.auto_update: "auto_update",
+            self.skip_skipped: "skip_skipped",
+            self.uid_clash: "uid_clash",
+        }
 
         for checkbox in self.checkboxes:
             checkbox.stateChanged.connect(self._emit_settings)
@@ -148,9 +177,8 @@ class SettingsTab(QWidget):
         self.exe_edit.blockSignals(True)
         self.dir_edit.blockSignals(True)
 
-        self.forced_window.setChecked(config_data.get("force_window_size", True))
-        self.auto_update.setChecked(config_data.get("auto_update", False))
-        self.skip_skipped.setChecked(config_data.get("skip_skipped", True))
+        for checkbox, key in self.checkboxes.items():
+            checkbox.setChecked(config_data.get(key, default_data[key]))
         self.exe_edit.setText(config_data.get("exe_path", "bad"))
         self.dir_edit.setText(config_data.get("track_dir", "bad"))
 
@@ -161,15 +189,13 @@ class SettingsTab(QWidget):
 
     def _emit_settings(self):
         """Emits checkbox states and text edit text"""
-        self.settings_changed.emit(
-            {
-                "force_window_size": self.forced_window.isChecked(),
-                "auto_update": self.auto_update.isChecked(),
-                "skip_skipped": self.skip_skipped.isChecked(),
-                "exe_path": self.exe_edit.text(),
-                "track_dir": self.dir_edit.text(),
-            }
+        settings = {}
+        for checkbox, key in self.checkboxes.items():
+            settings.update({key: checkbox.isChecked()})
+        settings.update(
+            {"exe_path": self.exe_edit.text(), "track_dir": self.dir_edit.text()}
         )
+        self.settings_changed.emit(settings)
 
 
 class BannedTracksTab(QWidget):
