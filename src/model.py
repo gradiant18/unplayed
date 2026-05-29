@@ -244,6 +244,7 @@ class GameSession:
         self.tracks = []
         self.finished = {}
         self.skipped = self.session_config["skipped"]
+        self.uids = {}
 
         self.go_next = False
         self.fetched = False
@@ -271,7 +272,7 @@ class GameSession:
         threading.Thread(target=self._daemon_get_tracks, daemon=True).start()
 
         # Wait for tracks
-        while not self.fetched:
+        while (not self.fetched) and (not self.tracks):
             time.sleep(0.1)
 
         if not self.tracks:
@@ -319,6 +320,19 @@ class GameSession:
         time.sleep(0.5)
         if self.current and not self.session_config.get("no_launch"):
             self.current.load(self.session_config["exe_path"], self.id)
+
+    def get_uid_clash(self) -> dict:
+        clashes = {}
+        for uid, ids in self.uids.items():
+            if len(ids) <= 1:
+                continue
+            care = False
+            for id in ids:
+                if not id[1]:
+                    care = True
+            if care:
+                clashes.update({uid: [id[0] for id in ids]})
+        return clashes
 
     def new_autosave(self, replay_path: str):
         """Determines if replay is the right track and fast enough"""
@@ -409,6 +423,11 @@ class GameSession:
                         valid_tracks.append(Track(t))
 
                     if valid_tracks:
+                        for track in valid_tracks:
+                            if track.uid in self.uids:
+                                self.uids[track.uid].add((track.id, bool(track.wr)))
+                            else:
+                                self.uids[track.uid] = set([(track.id, bool(track.wr))])
                         self.tracks.extend(valid_tracks)
 
                     current_last = results[-1]["TrackId"]

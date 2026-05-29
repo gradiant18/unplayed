@@ -7,7 +7,7 @@ from PyQt6.QtCore import QThread, QTimer, pyqtSignal
 
 from common import default_data, values
 from model import BannedTracksFetcher, ConfigModel, GameSession
-from view import Dialogs, FindPath
+from view import Dialogs, FindPath, UidClash
 
 
 class BannedTracksWorker(QThread):
@@ -412,7 +412,11 @@ class AppPresenter:
         if key.endswith("_state"):
             track_rule[base_key]["state"] = 2 if val else 0
         else:
-            if "time" in base_key and "author" not in base_key:
+            if (
+                "time" in base_key
+                and "inhas" not in base_key
+                and "beaten" not in base_key
+            ):
                 track_rule[base_key]["value"] = val.msecsSinceStartOfDay()
             elif "uploaded" in base_key:
                 track_rule[base_key]["value"] = datetime.fromtimestamp(
@@ -455,6 +459,16 @@ class AppPresenter:
         if self.model.data["force_window_size"]:
             self.view.setMinimumSize(self.view.minimumSizeHint())
             self.view.setMaximumSize(self.view.minimumSizeHint())
+
+        if not self.model.data.get("uid_clash", False):
+            return
+
+        clashes = self.session.get_uid_clash()
+        if clashes:
+            site_url = values[self.session.site]["url"]
+            dialog = UidClash(clashes, site_url)
+            if not dialog.exec():
+                return
 
     def generate_session_config(self):
         if not os.path.exists(self.model.data.get("exe_path", "")):
