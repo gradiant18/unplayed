@@ -4,6 +4,9 @@ bin/
 build/
 dist/
 unplayed/
+presets/
+*.json
+*.toml
 *.yaml
 *.yml
 *.bin

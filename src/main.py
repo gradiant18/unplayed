@@ -7,8 +7,6 @@ from model import ConfigModel
 from presenter import AppPresenter
 from view import MainWindow
 
-VERSION = "2.0.0"
-
 
 def main():
     parser = argparse.ArgumentParser(description="Play random tracks in TMNF/TMUF")
@@ -18,7 +16,7 @@ def main():
     args = parser.parse_args()
 
     app = QApplication(sys.argv)
-    model = ConfigModel(VERSION, args.nolaunch)
+    model = ConfigModel(args.nolaunch)
     view = MainWindow()
     presenter = AppPresenter(model, view)
     view.show()

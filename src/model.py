@@ -1,77 +1,149 @@
 import copy
 import csv
+import json
 import os
-import pickle
 import platform
 import random
 import re
 import subprocess
 import threading
 import time
+import tomlkit
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from io import StringIO
 from queue import Empty, Full, Queue
 
 import requests
-import semver
 from watchdog.events import PatternMatchingEventHandler
 from watchdog.observers import Observer
 
-from common import default_data, values
+from common import (
+    default_data,
+    values,
+    get_uid,
+    log,
+    AUTOSAVE_FILE,
+    CONFIG_FILE,
+    DATA_FILE,
+    DOWNLOAD_DIR,
+    LOG_FILE,
+    PRESETS_DIR,
+)
 
 
 class ConfigModel:
-    def __init__(self, version: str, no_launch: str):
-        self.version = version
-        self.no_launch = no_launch
-        self.data = copy.deepcopy(default_data)
+    def __init__(self, no_launch: bool):
+        open(LOG_FILE, "w").close()
 
-        open("log.log", "w").close()
-
+        self.config = self.load_config()
+        self.config["no_launch"] = no_launch
+        self.data = self.load_data()
         self.update_autosave_data()
-        self.load_data()
-        self.data["no_launch"] = no_launch
 
-    def load_skipped(self) -> set:
-        """Loads skipped tracks from file"""
-        site = self.data["game_rules"].get("site")
-        path = f"{site}_skipped.txt"
-        if not os.path.exists(path):
-            return set()
-        with open(path) as file:
-            data = file.read()
-        return {int(x.group(0)) for x in re.finditer(r"\d+", data)}
+    def load_config(self) -> dict:
+        """Loads config from file"""
+        try:
+            with open(CONFIG_FILE) as file:
+                config = tomlkit.load(file)
+        except Exception as e:
+            log(f"Error loading {CONFIG_FILE}: {e}")
+            config = tomlkit.loads(default_data)
 
-    def save_skipped(self, site: str, skipped: set):
-        """Saves skipped tracks to file"""
-        path = f"{site}_skipped.txt"
-        with open(path, "w") as file:
-            for id in skipped:
-                file.write(f"https://{values[site]['url']}/trackshow/{id}\n")
+        # TODO: verify config, load from default if wrong/missing
 
-    def _get_uid(self, path: str) -> str | None:
-        """Gets UID for path"""
-        for _ in range(10):
-            try:
-                with open(path, "rb") as file:
-                    data = file.read(4096)
-                if data and (match := re.search(rb'uid="(\w*)"', data)):
-                    return match.group(1).decode("utf-8")
-            except Exception:
-                pass
-            time.sleep(0.001)
-        return None
+        return self._str_to_date(config)
+
+    def save_config(self):
+        """Saves config to file"""
+        config = self._date_to_str(copy.deepcopy(self.config))
+        if config.get("default_data"):
+            del config["default_data"]
+
+        try:
+            with open(CONFIG_FILE, "w") as file:
+                tomlkit.dump(config, file)
+        except Exception as e:
+            log(f"Error saving {CONFIG_FILE}: {e}")
+
+    def load_data(self) -> dict:
+        try:
+            with open(DATA_FILE) as file:
+                data = json.load(file)
+        except Exception as e:
+            log(f"Error loading {DATA_FILE}: {e}")
+            data = {}
+            for site in values["all"]["site"]:
+                data[site] = {"skipped": [], "banned": []}
+        return data
+
+    def save_data(self):
+        data = copy.deepcopy(self.data)
+        for site in data:
+            data[site]["skipped"] = list(set(data[site]["skipped"]))
+            data[site]["banned"] = list(set(data[site]["banned"]))
+        try:
+            with open(DATA_FILE, "w") as file:
+                json.dump(data, file, indent=2)
+        except AttributeError as e:
+            log(f"Error saving {DATA_FILE}: {e}")
+
+    def get_presets(self) -> list[str]:
+        # NOTE: verify presets?
+        if not os.path.exists(PRESETS_DIR):
+            return []
+        entries = [entry for entry in os.scandir(PRESETS_DIR) if entry.is_file()]
+        return [
+            os.path.basename(file)[:-5]
+            for file in entries
+            if os.path.splitext(file)[1] == ".toml"
+        ]
+
+    def load_preset(self, name: str):
+        """Loads preset from file"""
+        try:
+            with open(os.path.join(PRESETS_DIR, f"{name}.toml")) as file:
+                config = tomlkit.load(file)
+        except Exception as e:
+            log(f"Error loading {os.path.join(PRESETS_DIR, f'{name}.toml')}: {e}")
+            return
+
+        # TODO: verify config, load from default if wrong/missing
+        return self._str_to_date(config)
+
+    def save_preset(self, name: str, preset: dict):
+        """Saves preset to file"""
+        preset = self._date_to_str(preset)
+        try:
+            os.makedirs(PRESETS_DIR, exist_ok=True)
+            with open(os.path.join(PRESETS_DIR, f"{name}.toml"), "w") as file:
+                tomlkit.dump(preset, file)
+        except Exception as e:
+            log(f"Error saving {os.path.join(PRESETS_DIR, f'{name}.toml')}: {e}")
+
+    def delete_preset(self, name: str):
+        try:
+            os.remove(os.path.join(PRESETS_DIR, f"{name}.toml"))
+        except Exception as e:
+            log(f"Error deleting preset {name}: {e}")
 
     def _load_autosave_data(self) -> dict:
         """Loads autosave data from file"""
         autosave_data = {"oldest": 0, "autosaves": set()}
-        path = "autosaves.bin"
-        if os.path.exists(path):
-            with open(path, "rb") as file:
-                data = pickle.load(file)
-                if data:
-                    autosave_data = data
+        if os.path.exists(AUTOSAVE_FILE):
+            with open(AUTOSAVE_FILE) as file:
+                data = file.read().splitlines()
+
+            if len(data) < 2:
+                return autosave_data
+
+            try:
+                oldest = float(data[0])
+            except Exception:
+                return autosave_data
+
+            autosave_data["oldest"] = oldest
+            autosave_data["autosaves"] = set(data[1:])
         return autosave_data
 
     def rescan_autosaves(self):
@@ -82,7 +154,7 @@ class ConfigModel:
         """Returns updated autosave data"""
         if not autosave_data:
             autosave_data = self._load_autosave_data()
-        autosave_dir = os.path.join(self.data["track_dir"], "Replays", "Autosaves")
+        autosave_dir = os.path.join(self.config["track_dir"], "Replays", "Autosaves")
         if not os.path.exists(autosave_dir):
             return autosave_data
 
@@ -101,7 +173,7 @@ class ConfigModel:
 
         autosave_data["oldest"] = new_oldest
         with ThreadPoolExecutor(max_workers=10) as exe:
-            new_uids = set(exe.map(self._get_uid, files))
+            new_uids = set(exe.map(get_uid, files))
         new_uids.discard(None)
 
         autosave_data["autosaves"].update(new_uids)
@@ -109,39 +181,60 @@ class ConfigModel:
 
     def save_autosaves(self):
         """Saves autosave data to file"""
-        path = "autosaves.bin"
         autosave_data = self.update_autosave_data()
-        with open(path, "wb") as file:
-            pickle.dump(autosave_data, file)
+        try:
+            with open(AUTOSAVE_FILE, "w") as file:
+                file.write(f"{str(autosave_data['oldest'])}\n")
+                file.write("\n".join(autosave_data["autosaves"]))
+        except Exception as e:
+            log(f"Error saving to {AUTOSAVE_FILE}: {e}")
 
-    def load_data(self):
-        """Loads data from file"""
-        data_path = "data.bin"
-        if os.path.exists(data_path):
-            try:
-                with open(data_path, "rb") as file:
-                    saved_data = pickle.load(file)
-                if (
-                    semver.Version.parse(self.version).major
-                    > semver.Version.parse(saved_data.get("version", "1.2.0")).major
-                ):
-                    self.log("Version mismatch, falling back to default data")
-                else:
-                    self.data = saved_data
-            except Exception as e:
-                self.log(f"Error loading data: {e}")
+    def delete_files(self):
+        files = [
+            "config.toml",
+            "data.json",
+            "autosaves.txt",
+            "log.log",
+        ]
+        for file in files:
+            if os.path.exists(file):
+                os.remove(file)
+        if os.path.exists(PRESETS_DIR):
+            for file in os.listdir(PRESETS_DIR):
+                os.remove(os.path.join(PRESETS_DIR, file))
+            os.rmdir(PRESETS_DIR)
 
-    def save_data(self):
-        """Saves data to file"""
-        data_path = "data.bin"
-        with open(data_path, "wb") as file:
-            pickle.dump(self.data, file)
+    def _date_to_str(self, config: dict) -> dict:
+        gr = config["game_rules"]
+        tr = config["track_rules"]
+        time_limit = datetime.strftime(gr["time_limit"]["value"], "%H:%M:%S")
+        at_min = datetime.strftime(tr["authortimemin"]["value"], "%H:%M:%S")
+        at_max = datetime.strftime(tr["authortimemax"]["value"], "%H:%M:%S")
+        after = datetime.strftime(tr["uploadedafter"]["value"], "%Y-%m-%dT%H:%M:%S")
+        befo = datetime.strftime(tr["uploadedbefore"]["value"], "%Y-%m-%dT%H:%M:%S")
 
-    def log(self, msg: str):
-        """Saves msg to log file"""
-        log_path = "log.log"
-        with open(log_path, "a") as file:
-            file.write(f"[{time.time()}] {msg}\n")
+        gr["time_limit"]["value"] = time_limit
+        tr["authortimemin"]["value"] = at_min
+        tr["authortimemax"]["value"] = at_max
+        tr["uploadedafter"]["value"] = after
+        tr["uploadedbefore"]["value"] = befo
+        return config
+
+    def _str_to_date(self, config: dict) -> dict:
+        gr = config["game_rules"]
+        tr = config["track_rules"]
+        time_limit = datetime.strptime(gr["time_limit"]["value"], "%H:%M:%S")
+        at_min = datetime.strptime(tr["authortimemin"]["value"], "%H:%M:%S")
+        at_max = datetime.strptime(tr["authortimemax"]["value"], "%H:%M:%S")
+        after = datetime.strptime(tr["uploadedafter"]["value"], "%Y-%m-%dT%H:%M:%S")
+        befo = datetime.strptime(tr["uploadedbefore"]["value"], "%Y-%m-%dT%H:%M:%S")
+
+        gr["time_limit"]["value"] = time_limit
+        tr["authortimemin"]["value"] = at_min
+        tr["authortimemax"]["value"] = at_max
+        tr["uploadedafter"]["value"] = after
+        tr["uploadedbefore"]["value"] = befo
+        return config
 
 
 class Track:
@@ -163,7 +256,7 @@ class Track:
             self.wr = wr.get("ReplayTime")
 
     def update_medal(self, replay_path: str) -> int | None:
-        """Updates and returns medal based on replay time from replay_path"""
+        """Updates medal and returns replay time based on replay time from replay_path"""
         with open(replay_path, "rb") as file:
             data = file.read(4096)
         if not data:
@@ -189,7 +282,7 @@ class Track:
 
     def download(self, track_dir: str, site: str):
         """Downloads track from site to track_dir"""
-        unplayed_path = os.path.join(track_dir, "Challenges", "Unplayed", site)
+        unplayed_path = os.path.join(track_dir, "Challenges", DOWNLOAD_DIR, site)
         os.makedirs(unplayed_path, exist_ok=True)
 
         self.path = os.path.join(unplayed_path, f"{self.id}.Challenge.gbx")
@@ -240,11 +333,10 @@ class GameSession:
         """Starts game session"""
         self.session_config = session_config
         self.autosaves = self.session_config["autosaves"]
+        self.current = None
         self.next = Queue(maxsize=1)
         self.tracks = []
         self.finished = {}
-        self.skipped = self.session_config["skipped"]
-        self.uids = {}
 
         self.go_next = False
         self.fetched = False
@@ -262,8 +354,9 @@ class GameSession:
         self.track_limit = self.session_config["game_rules"].get("track_limit", 0)
         self.mode = self.session_config["game_rules"].get("next_mode", "author")
         self.site = self.session_config["game_rules"].get("site", "TMNF-X")
-        banned = self.session_config.get("banned_tracks", {}).get(self.site, [])
-        self.banned_tracks = set(banned)
+
+        self.skipped = self.session_config["skipped"]
+        self.banned_tracks = self.session_config["banned_tracks"]
 
         if self.time_limit and self.time_limit.total_seconds() > 0:
             self.stop_time = self.start_time + self.time_limit
@@ -321,22 +414,9 @@ class GameSession:
         if self.current and not self.session_config.get("no_launch"):
             self.current.load(self.session_config["exe_path"], self.id)
 
-    def get_uid_clash(self) -> dict:
-        clashes = {}
-        for uid, ids in self.uids.items():
-            if len(ids) <= 1:
-                continue
-            care = False
-            for id in ids:
-                if not id[1]:
-                    care = True
-            if care:
-                clashes.update({uid: [id[0] for id in ids]})
-        return clashes
-
     def new_autosave(self, replay_path: str):
         """Determines if replay is the right track and fast enough"""
-        replay_uid = self._get_uid(replay_path)
+        replay_uid = get_uid(replay_path)
         if not self.current or self.current.uid != replay_uid:
             return
         if self.current.uid in self.autosaves:
@@ -356,7 +436,7 @@ class GameSession:
 
         self.autosaves.add(replay_uid)
         self.finished[self.current.uid] = self.current.medal
-        self.config_model.log(f"[FINISHED] {self.finished}")
+        log(f"[FINISHED] {self.finished}")
 
         if not self.stop_session:
             self.go_next = True
@@ -365,11 +445,11 @@ class GameSession:
         """Loads tracks and checks for stops"""
         while not self.stop_session:
             if self.track_limit and len(self.finished) >= self.track_limit:
-                self.config_model.log("[STOP] Track limit reached")
+                log("[STOP] Track limit reached")
                 self.stop("Track Limit Reached")
                 break
             if self.stop_time and datetime.now() > self.stop_time:
-                self.config_model.log("[STOP] Time limit reached")
+                log("[STOP] Time limit reached")
                 self.stop("Time Limit Reached")
                 break
 
@@ -423,20 +503,16 @@ class GameSession:
                         valid_tracks.append(Track(t))
 
                     if valid_tracks:
-                        for track in valid_tracks:
-                            if track.uid in self.uids:
-                                self.uids[track.uid].add((track.id, bool(track.wr)))
-                            else:
-                                self.uids[track.uid] = set([(track.id, bool(track.wr))])
                         self.tracks.extend(valid_tracks)
 
                     current_last = results[-1]["TrackId"]
                     if not data.get("More", False):
                         break
-                    self.config_model.log(f"[API] Tracks so far: {len(self.tracks)}")
+                    log(f"[API] Tracks so far: {len(self.tracks)}")
+                    time.sleep(3)
 
                 except requests.exceptions.RequestException as e:
-                    self.config_model.log(f"[API] Error: {e}")
+                    log(f"[API] Error: {e}")
                     retries += 1
                     time.sleep(1)
 
@@ -453,25 +529,10 @@ class GameSession:
             if track.uid in self.autosaves:
                 continue
             track.download(self.session_config["track_dir"], self.site)
-            while not self.stop_session:
-                try:
-                    self.next.put(track, timeout=0.5)
-                    break
-                except Full:
-                    pass
-
-    def _get_uid(self, path: str) -> str | None:
-        """Gets UID for path"""
-        for _ in range(10):
             try:
-                with open(path, "rb") as file:
-                    data = file.read(4096)
-                if data and (match := re.search(rb'uid="(\w*)"', data)):
-                    return match.group(1).decode("utf-8")
-            except Exception:
+                self.next.put(track, timeout=0.5)
+            except Full:
                 pass
-            time.sleep(0.001)
-        return None
 
 
 class BannedTracksFetcher:
@@ -494,9 +555,10 @@ class BannedTracksFetcher:
             resp.raise_for_status()
             ids = []
             for row in csv.reader(StringIO(resp.text)):
-                if len(row) > 1 and row[1].strip() and row[1].strip() != "TrackID":
+                val = row[1].strip() if len(row) > 1 else ""
+                if val and val != "TrackID":
                     try:
-                        ids.append(int(row[1].strip()))
+                        ids.append(int(val))
                     except ValueError:
                         pass
             return name, ids

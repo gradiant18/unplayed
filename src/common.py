@@ -1,6 +1,12 @@
-import datetime
+import re
+import time
 
-today = datetime.datetime.today()
+AUTOSAVE_FILE = "autosaves.txt"
+CONFIG_FILE = "config.toml"
+DATA_FILE = "data.json"
+DOWNLOAD_DIR = "Unplayed"
+LOG_FILE = "log.txt"
+PRESETS_DIR = "presets"
 
 values = {
     "all": {
@@ -176,57 +182,52 @@ values = {
     },
 }
 
-default_data = {
-    "version": "2.0.0",
-    "exe_path": "",
-    "track_dir": "",
-    "force_window_size": True,
-    "auto_update": False,
-    "skip_skipped": True,
-    "uid_clash": False,
-    "default_data": True,
-    "game_rules": {},
-    "track_rules": {},
-    "preset": "Default",
-    "presets": {
-        "Default": {
-            "game_rules": {
-                "next_mode": "finished",
-                "track_limit": {"state": 0, "value": 1},
-                "time_limit": {"state": 2, "value": datetime.timedelta(minutes=15)},
-                "site": "TMNF-X",
-            },
-            "track_rules": {
-                "uploadedafter": {
-                    "state": 0,
-                    "value": datetime.datetime(2008, 4, 3, 0, 0, 0),
-                },
-                "uploadedbefore": {
-                    "state": 0,
-                    "value": datetime.datetime(
-                        today.year, today.month, today.day, 23, 59, 59
-                    ),
-                },
-                "authortimemin": {"state": 0, "value": 0},
-                "authortimemax": {"state": 0, "value": 0},
-                "inunlimiter": {"state": 0, "value": 0},
-                "unlimiterver": {"state": 0, "value": 0},
-                "tag": {"state": 0, "value": 0},
-                "primarytype": {"state": 0, "value": 0},
-                "environment": {"state": 0, "value": 7},
-                "mood": {"state": 0, "value": 1},
-                "difficulty": {"state": 0, "value": 0},
-                "inhasrecord": {"state": 2, "value": 0},
-                "inauthortimebeaten": {"state": 0, "value": 0},
-                "order1": {"state": 2, "value": 39},
-            },
-        }
-    },
-    "banned_tracks": {
-        "TMUF-X": set(),
-        "TMNF-X": set(),
-        "TMO-X": set(),
-        "TMS-X": set(),
-        "TMN-X": set(),
-    },
-}
+default_data = """exe_path = ""
+track_dir = ""
+force_window_size = true
+auto_update = false
+skip_skipped = true
+default_data = true
+
+[game_rules]
+next_mode = "finished"
+site = "TMNF-X"
+track_limit = {enabled = false, value = 15}
+time_limit = {enabled = true, value = "00:20:00"}
+
+[track_rules]
+tag = {enabled = false, value = 0}
+mood = {enabled = false, value = 1}
+order1 = {enabled = true, value = 39}
+difficulty = {enabled = false, value = 0}
+inhasrecord = {enabled = true, value = 0}
+primarytype = {enabled = false, value = 0}
+environment = {enabled = false, value = 7}
+inunlimiter = {enabled = false, value = 0}
+unlimiterver = {enabled = false, value = 0}
+authortimemin = {enabled = false, value = "00:00:00"}
+authortimemax = {enabled = true, value = "00:03:00"}
+uploadedafter = {enabled = true, value = "2010-01-01T00:00:00"}
+uploadedbefore = {enabled = true, value = "2020-12-31T23:59:59"}
+inauthortimebeaten = {enabled = false, value = 0}
+"""
+
+
+def get_uid(path: str) -> str | None:
+    """Gets UID for path"""
+    for _ in range(10):
+        try:
+            with open(path, "rb") as file:
+                data = file.read(4096)
+            if data and (match := re.search(rb'uid="(\w*)"', data)):
+                return match.group(1).decode("utf-8")
+        except Exception as e:
+            log(f"Error getting UID: {e}")
+        time.sleep(0.001)
+    return None
+
+
+def log(msg: str):
+    """Saves msg to log file"""
+    with open(LOG_FILE, "a") as file:
+        file.write(f"[{time.time()}] {msg}\n")

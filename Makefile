@@ -8,5 +8,5 @@ clean:
 	rm -rf ./build ./dist .__pycache__ ./src/__pycache__ ./unplayed
 	rm -f *.spec *.bin *.log *_skipped.txt
 
-build:
+build: ./src/*
 	pyinstaller ./src/main.py -F --noconsole --name "unplayed"
