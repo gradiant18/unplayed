@@ -11,5 +11,6 @@ PyQt6_sip==13.11.1
 requests==2.33.1
 semver==3.0.4
 setuptools==82.0.1
+tomlkit==0.15.0
 urllib3==2.6.3
 watchdog==6.0.0
