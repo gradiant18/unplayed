@@ -107,6 +107,8 @@ class AppPresenter:
         exe = "TmForever.exe"
 
         steam_paths = {
+            os.path.join(str(os.getenv("ProgramFiles")), "TmUnitedForever"): "TMUF",
+            os.path.join(str(os.getenv("ProgramFiles")), "TmNationsForever"): "TMNF",
             os.path.join(str(os.getenv("ProgramFiles")), steam, tmuf, exe): "TMUF",
             os.path.join(str(os.getenv("ProgramFiles")), steam, tmnf, exe): "TMNF",
             os.path.join(str(os.getenv("ProgramFiles(x86)")), steam, tmuf, exe): "TMUF",
@@ -405,9 +407,13 @@ class AppPresenter:
             if rule == "inunlimiter":
                 continue
             if rule == "unlimiterver":
-                if rule_dict["value"] == 0 and rule_dict["enabled"]:
-                    rule_dict["enabled"] = False
+                if rule_dict["enabled"]:
                     config["track_rules"]["inunlimiter"] = 1
+                    if rule_dict["value"] == 0:
+                        rule_dict["enabled"] = False
+                else:
+                    rule_dict[rule] = None
+                    config["track_rules"]["inunlimiter"] = None
 
             config["track_rules"][rule] = (
                 rule_dict["value"] if rule_dict["enabled"] else None
@@ -420,7 +426,6 @@ class AppPresenter:
         site_data = copy.deepcopy(self.model.data[game_rule["site"]])
         config["skipped"] = set(site_data["skipped"])
         config["banned_tracks"] = set(site_data["banned"])
-        # config["uids"] = site_data["clashes"]
 
         return config
 

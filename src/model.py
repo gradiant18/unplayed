@@ -482,6 +482,7 @@ class GameSession:
                 try:
                     params["after"] = current_last
                     response = http.get(api_url, params=params, timeout=10)
+                    log(f"[API] {response.url}")
                     response.raise_for_status()
                     data = response.json()
                     results = data.get("Results", [])
@@ -529,10 +530,12 @@ class GameSession:
             if track.uid in self.autosaves:
                 continue
             track.download(self.session_config["track_dir"], self.site)
-            try:
-                self.next.put(track, timeout=0.5)
-            except Full:
-                pass
+            while not self.stop_session:
+                try:
+                    self.next.put(track, timeout=0.5)
+                    break
+                except Full:
+                    pass
 
 
 class BannedTracksFetcher:
