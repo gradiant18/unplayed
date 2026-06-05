@@ -1,5 +1,4 @@
 import re
-import webbrowser
 
 from PyQt6.QtCore import QDateTime, Qt, QTime, pyqtSignal
 from PyQt6.QtWidgets import (
@@ -28,7 +27,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from common import values, default_data
+from common import values
 
 
 class FindPath(QDialog):
@@ -46,6 +45,8 @@ class FindPath(QDialog):
 
         self._display_paths()
         self.setLayout(self.main_layout)
+        self.setMinimumSize(self.minimumSizeHint())
+        self.setMaximumSize(self.minimumSizeHint())
 
     def _display_paths(self):
         """Display all found paths to select from"""
@@ -86,28 +87,6 @@ class FindPath(QDialog):
         self.accept()
 
 
-class UidClash(QDialog):
-    def __init__(self, clashes: dict, site_url: str):
-        super().__init__()
-        main_layout = QVBoxLayout()
-        self.setWindowTitle("UID Clashes")
-
-        for uid, ids in clashes.items():
-            row = QHBoxLayout()
-            row.addWidget(QLabel(f"{uid} -> "))
-            for id in ids:
-                btn = QPushButton(str(id))
-                url = f"https://{site_url}/trackshow/{id}"
-                btn.clicked.connect(lambda _, url=url: self._open_url(url))
-                row.addWidget(btn)
-            main_layout.addLayout(row)
-
-        self.setLayout(main_layout)
-
-    def _open_url(self, url: str):
-        webbrowser.open(url)
-
-
 class SettingsTab(QWidget):
     settings_changed = pyqtSignal(dict)
     delete_data_requested = pyqtSignal()
@@ -123,13 +102,11 @@ class SettingsTab(QWidget):
         self.forced_window = QCheckBox("Force Window Size")
         self.auto_update = QCheckBox("Auto Update Banned Tracks")
         self.skip_skipped = QCheckBox("Don't Play Skipped Tracks")
-        self.uid_clash = QCheckBox("Detect UID Clashes")
 
         self.checkboxes = {
             self.forced_window: "force_window_size",
             self.auto_update: "auto_update",
             self.skip_skipped: "skip_skipped",
-            self.uid_clash: "uid_clash",
         }
 
         for checkbox in self.checkboxes:
@@ -178,7 +155,8 @@ class SettingsTab(QWidget):
         self.dir_edit.blockSignals(True)
 
         for checkbox, key in self.checkboxes.items():
-            checkbox.setChecked(config_data.get(key, default_data[key]))
+            # FIX: if error set to proper default
+            checkbox.setChecked(config_data.get(key, True))
         self.exe_edit.setText(config_data.get("exe_path", "bad"))
         self.dir_edit.setText(config_data.get("track_dir", "bad"))
 
@@ -200,8 +178,6 @@ class SettingsTab(QWidget):
 
 class BannedTracksTab(QWidget):
     save_requested = pyqtSignal()
-    import_requested = pyqtSignal(str)
-    export_requested = pyqtSignal(str)
     clear_requested = pyqtSignal()
     update_requested = pyqtSignal()
     tracks_modified = pyqtSignal(str, set)
@@ -210,9 +186,9 @@ class BannedTracksTab(QWidget):
         super().__init__()
         self.site_tabs = {}
 
-        main_layout = QHBoxLayout()
+        main_layout = QVBoxLayout()
         self.tab_widget = QTabWidget()
-        for site in ["TMUF-X", "TMNF-X", "TMO-X", "TMS-X", "TMN-X"]:
+        for site in values["all"]["site"]:
             text = QTextEdit()
             text.textChanged.connect(lambda s=site, t=text: self._on_text_changed(s, t))
             self.site_tabs[site] = text
@@ -220,11 +196,9 @@ class BannedTracksTab(QWidget):
 
         main_layout.addWidget(self.tab_widget)
 
-        btn_layout = QVBoxLayout()
+        btn_layout = QHBoxLayout()
         btns = {
             "Save": self.save_requested,
-            "Import": self._trigger_import,
-            "Export": self._trigger_export,
             "Clear": self.clear_requested,
             "Update": self.update_requested,
         }
@@ -239,37 +213,24 @@ class BannedTracksTab(QWidget):
         main_layout.addLayout(btn_layout)
         self.setLayout(main_layout)
 
-    def populate(self, banned_tracks):
+    def populate(self, data: dict):
         """Populates each site tabs text with banned_tracks"""
-        for site, ids in banned_tracks.items():
+        for site, item in data.items():
             if site in self.site_tabs:
                 te = self.site_tabs[site]
                 te.blockSignals(True)
-                te.setText("\n".join(map(str, ids)))
+                te.setText("\n".join(map(str, item["banned"])))
                 te.blockSignals(False)
 
     def _on_text_changed(self, site, text):
         ids = {int(id) for id in re.findall(r"\d+", text.toPlainText())}
         self.tracks_modified.emit(site, ids)
 
-    def _trigger_import(self):
-        path = QFileDialog.getOpenFileName(self, "Open File")[0]
-        if path:
-            self.import_requested.emit(path)
-
-    def _trigger_export(self):
-        path = QFileDialog.getSaveFileName(
-            self, "Export File", filter="*.yaml *.yml *.txt"
-        )[0]
-        if path:
-            self.export_requested.emit(path)
-
 
 class OptionsTab(QWidget):
-    preset_changed = pyqtSignal(str)
-    save_preset_requested = pyqtSignal()
-    new_preset_requested = pyqtSignal(str)
-    delete_preset_requested = pyqtSignal()
+    preset_loaded = pyqtSignal(str)
+    save_preset_requested = pyqtSignal(str)
+    delete_preset_requested = pyqtSignal(str)
 
     game_rule_changed = pyqtSignal(str, object)
     track_rule_changed = pyqtSignal(str, object)
@@ -285,17 +246,18 @@ class OptionsTab(QWidget):
         # Presets
         preset_layout = QHBoxLayout()
         self.preset_combo = QComboBox()
-        self.preset_combo.currentTextChanged.connect(self.preset_changed.emit)
-        self.btn_save_preset = QPushButton("Save")
-        self.btn_save_preset.clicked.connect(self.save_preset_requested.emit)
-        btn_new = QPushButton("Save As")
-        btn_new.clicked.connect(self._trigger_new_preset)
-        self.btn_del_preset = QPushButton("Delete")
-        self.btn_del_preset.clicked.connect(self.delete_preset_requested.emit)
+        self.preset_combo.addItems(["Load"])
+        self.preset_combo.currentTextChanged.connect(self.preset_loaded.emit)
+        self.save_preset = QComboBox()
+        self.save_preset.addItems(["Save", "New..."])
+        self.save_preset.currentTextChanged.connect(self.save_preset_requested.emit)
+        self.del_preset = QComboBox()
+        self.del_preset.addItems(["Delete"])
+        self.del_preset.currentTextChanged.connect(self.delete_preset_requested.emit)
+        preset_layout.addWidget(QLabel("Presets   ->"))
         preset_layout.addWidget(self.preset_combo)
-        preset_layout.addWidget(self.btn_save_preset)
-        preset_layout.addWidget(btn_new)
-        preset_layout.addWidget(self.btn_del_preset)
+        preset_layout.addWidget(self.save_preset)
+        preset_layout.addWidget(self.del_preset)
         layout.addLayout(preset_layout)
 
         # Game Rules
@@ -315,7 +277,7 @@ class OptionsTab(QWidget):
         self.track_limit_spn.setMinimum(1)
         self.track_limit_spn.setMaximum(1000)
         self.track_limit_chk.stateChanged.connect(
-            lambda s: self._emit_state("track_limit", s, self.track_limit_spn, True)
+            lambda s: self._emit_enabled("track_limit", s, self.track_limit_spn, True)
         )
         self.track_limit_spn.valueChanged.connect(
             lambda v: self.game_rule_changed.emit("track_limit_val", v)
@@ -329,8 +291,8 @@ class OptionsTab(QWidget):
         self.time_limit_edit = QTimeEdit()
         self.time_limit_edit.setDisplayFormat("HH:mm:ss")
         self.time_limit_chk.stateChanged.connect(
-            lambda state: self._emit_state(
-                "time_limit", state, self.time_limit_edit, True
+            lambda enabled: self._emit_enabled(
+                "time_limit", enabled, self.time_limit_edit, True
             )
         )
         self.time_limit_edit.timeChanged.connect(
@@ -411,7 +373,7 @@ class OptionsTab(QWidget):
                     self.widgets[item[1]] = widget
 
                 checkbox.stateChanged.connect(
-                    lambda s, k=item[1], w=widget: self._emit_state(k, s, w, False)
+                    lambda s, k=item[1], w=widget: self._emit_enabled(k, s, w, False)
                 )
                 self.widgets[f"{item[1]}_chk"] = checkbox
                 self.widgets[f"{item[1]}_wdg"] = widget
@@ -439,7 +401,7 @@ class OptionsTab(QWidget):
         date = QDateTimeEdit()
         date.setDisplayFormat("yyyy-MM-dd HH:mm:ss")
         checkbox.stateChanged.connect(
-            lambda state: self._emit_state(key, state, date, False)
+            lambda enabled: self._emit_enabled(key, enabled, date, False)
         )
         date.dateTimeChanged.connect(
             lambda value: self.track_rule_changed.emit(f"{key}_val", value)
@@ -448,40 +410,37 @@ class OptionsTab(QWidget):
         self.widgets[f"{key}_wdg"] = date
         return checkbox, date
 
-    def _emit_state(self, key, state, widget, is_game):
-        widget.setEnabled(state == 2)
+    def _emit_enabled(self, key, enabled, widget, is_game):
+        widget.setEnabled(enabled == 2)
         if is_game:
-            self.game_rule_changed.emit(f"{key}_state", state == 2)
+            self.game_rule_changed.emit(f"{key}_enabled", enabled == 2)
         else:
-            self.track_rule_changed.emit(f"{key}_state", state == 2)
+            self.track_rule_changed.emit(f"{key}_enabled", enabled == 2)
 
-    def _trigger_new_preset(self):
-        while True:
-            preset_name, ok = QInputDialog.getText(
-                self, "New Preset", "Name your new preset:"
-            )
-            if not ok:
-                return
-            if preset_name == "":
-                QMessageBox.warning(
-                    self, "Empty Preset Name", "Please give your preset a name."
-                )
-                continue
-            if preset_name == "---":
-                QMessageBox.warning(
-                    self, "Invalid Preset Name", "--- is an invalid preset name."
-                )
-                continue
-            break
-        self.new_preset_requested.emit(preset_name)
-
-    def populate_presets(self, presets: list, current: str):
+    def populate_presets(self, presets: list):
         """Populates list of presets"""
         self.preset_combo.blockSignals(True)
+        self.save_preset.blockSignals(True)
+        self.del_preset.blockSignals(True)
         self.preset_combo.clear()
-        self.preset_combo.addItems(presets)
-        self.preset_combo.setCurrentText(current)
+        self.save_preset.clear()
+        self.del_preset.clear()
+
+        if len(presets) < 1:
+            self.preset_combo.setEnabled(False)
+            self.del_preset.setEnabled(False)
+        else:
+            self.preset_combo.setEnabled(True)
+            self.del_preset.setEnabled(True)
+
+        presets.sort()
+        self.preset_combo.addItems(["Load"] + presets)
+        self.save_preset.addItems(["Save"] + presets + ["New..."])
+        self.del_preset.addItems(["Delete"] + presets)
+
         self.preset_combo.blockSignals(False)
+        self.save_preset.blockSignals(False)
+        self.del_preset.blockSignals(False)
 
     def update_comboboxes(self, site: str):
         """Update site specific comboboxes"""
@@ -523,15 +482,15 @@ class OptionsTab(QWidget):
         )
         self.site_combo.setCurrentText(game_rules["site"])
 
-        self.track_limit_chk.setChecked(game_rules["track_limit"]["state"])
+        self.track_limit_chk.setChecked(game_rules["track_limit"]["enabled"])
         self.track_limit_spn.setValue(game_rules["track_limit"]["value"])
-        self.track_limit_spn.setEnabled(game_rules["track_limit"]["state"])
+        self.track_limit_spn.setEnabled(game_rules["track_limit"]["enabled"])
 
-        self.time_limit_chk.setChecked(game_rules["time_limit"]["state"])
-        self.time_limit_edit.setTime(
-            QTime(0, 0).addSecs(int(game_rules["time_limit"]["value"].total_seconds()))
-        )
-        self.time_limit_edit.setEnabled(game_rules["time_limit"]["state"])
+        self.time_limit_chk.setChecked(game_rules["time_limit"]["enabled"])
+        dt = game_rules["time_limit"]["value"]
+        secs = (dt.hour * 3600) + (dt.minute * 60) + dt.second
+        self.time_limit_edit.setTime(QTime(0, 0).addSecs(secs))
+        self.time_limit_edit.setEnabled(game_rules["time_limit"]["enabled"])
 
         # Generic setter for track rules
         for key, config in track_rules.items():
@@ -543,11 +502,13 @@ class OptionsTab(QWidget):
             chk.blockSignals(True)
             wdg.blockSignals(True)
 
-            chk.setChecked(config["state"])
-            wdg.setEnabled(config["state"])
+            chk.setChecked(config["enabled"])
+            wdg.setEnabled(config["enabled"])
 
             if "authortime" in key and "min" in key or "max" in key:
-                wdg.setTime(QTime(0, 0).fromMSecsSinceStartOfDay(config["value"]))
+                t = config["value"]
+                msecs = ((t.hour * 3600) + (t.minute * 60) + (t.second)) * 1000
+                wdg.setTime(QTime(0, 0).fromMSecsSinceStartOfDay(msecs))
             elif "uploaded" in key:
                 wdg.setDateTime(
                     QDateTime().fromSecsSinceEpoch(int(config["value"].timestamp()))
@@ -564,20 +525,17 @@ class OptionsTab(QWidget):
             chk.blockSignals(False)
             wdg.blockSignals(False)
 
-    def deselected_preset(self):
-        self.btn_save_preset.setEnabled(False)
-        self.preset_combo.setCurrentText("---")
-        self.btn_del_preset.setEnabled(False)
+    def reset_presets(self):
+        self.preset_combo.blockSignals(True)
+        self.save_preset.blockSignals(True)
+        self.del_preset.blockSignals(True)
+        self.preset_combo.setCurrentText("Load")
+        self.save_preset.setCurrentText("Save")
+        self.del_preset.setCurrentText("Delete")
 
-    def selected_preset(self):
-        self.btn_save_preset.setEnabled(True)
-        self.btn_del_preset.setEnabled(True)
-
-    def disable_delete_preset(self):
-        self.btn_del_preset.setEnabled(False)
-
-    def enable_delete_preset(self):
-        self.btn_del_preset.setEnabled(True)
+        self.preset_combo.blockSignals(False)
+        self.save_preset.blockSignals(False)
+        self.del_preset.blockSignals(False)
 
 
 class GameTab(QWidget):
@@ -664,6 +622,46 @@ class Dialogs:
         if reply == QMessageBox.StandardButton.Yes:
             return True
 
+    @staticmethod
+    def new_preset_name(parent, preset_names: list):
+        while True:
+            preset_name, ok = QInputDialog.getText(
+                parent, "New Preset", "Name your new preset:"
+            )
+            if not ok:
+                return
+
+            if not re.match(r"^\w{1,29}$", preset_name):
+                QMessageBox.warning(
+                    parent,
+                    "Invalid Preset Name",
+                    "Preset name must be alphanumeric and less than 30 characters",
+                )
+                continue
+
+            if preset_name in [
+                "Load",
+                "Save",
+                "New...",
+                "Delete",
+            ]:
+                QMessageBox.warning(
+                    parent,
+                    "Invalid Preset Name",
+                    f"{preset_name} is a invalid preset name.",
+                )
+                continue
+            if preset_name in preset_names:
+                reply = QMessageBox.question(
+                    parent,
+                    "Duplicate Preset Name",
+                    f"Do you want to overwrite preset {preset_name}",
+                )
+                if reply != QMessageBox.StandardButton.Yes:
+                    return
+            break
+        return preset_name
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -697,13 +695,16 @@ class MainWindow(QMainWindow):
     def show_error(self, title, msg):
         QMessageBox.warning(self, title, msg)
 
-    def show_info(self, title, msg):
-        QMessageBox.information(self, title, msg)
-
-    def show_game(self):
+    def show_game(self, force_window_size=True):
         """Switch to game screen"""
         self.stacked.setCurrentIndex(1)
+        if force_window_size:
+            self.setMinimumHeight(220)
+            self.setMaximumHeight(220)
 
-    def show_config(self):
+    def show_config(self, force_window_size=True):
         """Switch to config screen"""
         self.stacked.setCurrentIndex(0)
+        if force_window_size:
+            self.setMinimumSize(self.minimumSizeHint())
+            self.setMaximumSize(self.minimumSizeHint())

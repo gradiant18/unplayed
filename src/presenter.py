@@ -1,13 +1,12 @@
 import copy
 import os
-import re
 from datetime import datetime, timedelta
 
 from PyQt6.QtCore import QThread, QTimer, pyqtSignal
 
-from common import default_data, values
+from common import values
 from model import BannedTracksFetcher, ConfigModel, GameSession
-from view import Dialogs, FindPath, UidClash
+from view import Dialogs, FindPath
 
 
 class BannedTracksWorker(QThread):
@@ -31,30 +30,15 @@ class AppPresenter:
         self.progress_timer = QTimer()
         self.progress_timer.timeout.connect(self.update_game_ui)
 
-        if self.model.data.get("auto_update"):
+        if self.model.config.get("auto_update"):
             self.handle_banned_update()
 
         self.connect_signals()
+        self.refresh_ui_from_model()
 
-        if self.model.data.get("default_data"):
-            self.model.data["default_data"] = False
-            self.handle_preset_changed("Default")
-            self.view.options_tab.disable_delete_preset()
-            self.refresh_ui_from_model()
+        if "default_data" in self.model.config.keys():
+            del self.model.config["default_data"]
             self.save_model(silent=True)
-        else:
-            self.refresh_ui_from_model()
-            game_rules = self.model.data["game_rules"]
-            track_rules = self.model.data["track_rules"]
-            preset = self.model.data["preset"]
-            if (
-                game_rules != self.model.data["presets"][preset]["game_rules"]
-                or track_rules != self.model.data["presets"][preset]["track_rules"]
-            ):
-                presets = list(self.model.data["presets"].keys())
-                presets.append("---")
-                self.view.options_tab.populate_presets(presets, "---")
-                self.view.options_tab.deselected_preset()
 
     def connect_signals(self):
         self.view.settings_tab.settings_changed.connect(self.handle_settings_changed)
@@ -68,12 +52,9 @@ class AppPresenter:
         self.view.banned_tab.clear_requested.connect(self.handle_banned_clear)
         self.view.banned_tab.update_requested.connect(self.handle_banned_update)
         self.view.banned_tab.tracks_modified.connect(self.handle_banned_modified)
-        self.view.banned_tab.export_requested.connect(self.handle_banned_export)
-        self.view.banned_tab.import_requested.connect(self.handle_banned_import)
 
-        self.view.options_tab.preset_changed.connect(self.handle_preset_changed)
+        self.view.options_tab.preset_loaded.connect(self.handle_preset_changed)
         self.view.options_tab.save_preset_requested.connect(self.handle_save_preset)
-        self.view.options_tab.new_preset_requested.connect(self.handle_new_preset)
         self.view.options_tab.delete_preset_requested.connect(self.handle_delete_preset)
         self.view.options_tab.game_rule_changed.connect(self.handle_game_rule_changed)
         self.view.options_tab.track_rule_changed.connect(self.handle_track_rule_changed)
@@ -85,33 +66,32 @@ class AppPresenter:
         self.view.game_tab.stop_requested.connect(lambda: self.session.stop())
 
     def refresh_ui_from_model(self):
-        if self.model.data["force_window_size"]:
+        if self.model.config["force_window_size"]:
             self.view.setMinimumSize(self.view.minimumSizeHint())
             self.view.setMaximumSize(self.view.minimumSizeHint())
 
-        self.view.settings_tab.populate(self.model.data)
-        self.view.banned_tab.populate(self.model.data.get("banned_tracks", {}))
+        self.view.settings_tab.populate(self.model.config)
+        self.view.banned_tab.populate(self.model.data)
 
-        self.view.options_tab.populate_presets(
-            list(self.model.data["presets"].keys()), self.model.data["preset"]
-        )
+        self.view.options_tab.populate_presets(self.model.get_presets())
 
-        game_rules = self.model.data["game_rules"]
-        track_rules = self.model.data["track_rules"]
+        game_rules = self.model.config["game_rules"]
+        track_rules = self.model.config["track_rules"]
         self.view.options_tab.update_comboboxes(game_rules["site"])
         self.view.options_tab.populate_rules(game_rules, track_rules)
 
     def save_model(self, silent=False):
         if not silent:
             self.view.set_status("Saving...")
+        self.model.save_config()
         self.model.save_data()
         self.model.save_autosaves()
         if not silent:
             self.view.set_status("Saved!", 3000)
 
     def handle_settings_changed(self, new_settings):
-        self.model.data.update(new_settings)
-        if self.model.data["force_window_size"]:
+        self.model.config.update(new_settings)
+        if self.model.config["force_window_size"]:
             hint = self.view.minimumSizeHint()
             self.view.setFixedSize(hint)
         else:
@@ -127,6 +107,8 @@ class AppPresenter:
         exe = "TmForever.exe"
 
         steam_paths = {
+            os.path.join(str(os.getenv("ProgramFiles")), "TmUnitedForever"): "TMUF",
+            os.path.join(str(os.getenv("ProgramFiles")), "TmNationsForever"): "TMNF",
             os.path.join(str(os.getenv("ProgramFiles")), steam, tmuf, exe): "TMUF",
             os.path.join(str(os.getenv("ProgramFiles")), steam, tmnf, exe): "TMNF",
             os.path.join(str(os.getenv("ProgramFiles(x86)")), steam, tmuf, exe): "TMUF",
@@ -165,8 +147,8 @@ class AppPresenter:
                 )
             else:
                 break
-        self.model.data["exe_path"] = path
-        self.view.settings_tab.populate(self.model.data)
+        self.model.config["exe_path"] = path
+        self.view.settings_tab.populate(self.model.config)
         return True
 
     def handle_find_track(self):
@@ -214,8 +196,8 @@ class AppPresenter:
             else:
                 break
 
-        self.model.data["track_dir"] = path
-        self.view.settings_tab.populate(self.model.data)
+        self.model.config["track_dir"] = path
+        self.view.settings_tab.populate(self.model.config)
         return True
 
     def handle_rescan_autosaves(self):
@@ -230,23 +212,10 @@ class AppPresenter:
         if not reply:
             self.view.set_status("Canceled.", 3000)
             return
-        files = [
-            "data.bin",
-            "autosaves.bin",
-            "log.log",
-            "TMUF_skipped.txt",
-            "TMNF_skipped.txt",
-            "TMO_skipped.txt",
-            "TMS_skipped.txt",
-            "TMN_skipped.txt",
-        ]
-        for file in files:
-            if os.path.exists(file):
-                os.remove(file)
 
-        self.model.data = copy.deepcopy(default_data)
-        self.model.data["default_data"] = False
-        self.handle_preset_changed("Default")
+        self.model.delete_files()
+        self.model.config = self.model.load_config()
+        self.model.data = self.model.load_data()
         self.save_model(silent=True)
         self.refresh_ui_from_model()
         self.view.set_status("Deleted.", 3000)
@@ -260,10 +229,10 @@ class AppPresenter:
         if not reply:
             self.view.set_status("Canceled.", 3000)
             return
-        self.model.data["banned_tracks"] = {
-            site: set() for site in values["all"]["site"]
-        }
-        self.view.banned_tab.populate(self.model.data["banned_tracks"])
+
+        for site in values["all"]["site"]:
+            self.model.data[site]["banned"] = []
+        self.view.banned_tab.populate(self.model.data)
         self.view.set_status("Cleared.", 3000)
 
     def handle_banned_update(self):
@@ -275,10 +244,9 @@ class AppPresenter:
         self.banned_worker.start()
 
     def _on_banned_update_success(self, data: dict):
-        self.model.data["banned_tracks"] = {
-            site: set(ids) for site, ids in data.items()
-        }
-        self.view.banned_tab.populate(self.model.data["banned_tracks"])
+        for site, ids in data.items():
+            self.model.data[site]["banned"] = set(ids)
+        self.view.banned_tab.populate(self.model.data)
         self.save_model()
         self.view.set_status("Updated!", 3000)
 
@@ -289,83 +257,38 @@ class AppPresenter:
         )
 
     def handle_banned_modified(self, site: str, ids: set):
-        self.model.data["banned_tracks"][site] = ids
-
-    def handle_banned_export(self, path: str):
-        pattern = re.compile(r"\.(txt|ya?ml)$", re.IGNORECASE)
-        match = re.match(pattern, path)
-        if not match:
-            path += ".yml"
-
-        with open(path, "w") as file:
-            for site, ids in self.model.data["banned_tracks"].items():
-                file.write(f"{site}:\n")
-                for id in ids:
-                    file.write(f" - {id}\n")
-
-    def handle_banned_import(self, path: str):
-        with open(path, "r") as f:
-            data = f.read()
-        pattern = re.compile(r"\b(TMUF|TMNF|TMO|TMS|TMN)(?:-X)?\b", re.IGNORECASE)
-        matches = list(pattern.finditer(data))
-        total = 0
-        for i, match in enumerate(matches):
-            site = f"{match.group(1).upper()}-X"
-            end = matches[i + 1].start() if i + 1 < len(matches) else len(data)
-            ids = {int(id) for id in re.findall(r"\d+", data[match.end() : end])}
-            total += len(ids)
-            self.model.data["banned_tracks"][site].update(ids)
-        self.view.banned_tab.populate(self.model.data["banned_tracks"])
-        self.view.set_status(f"Imported {total} ids!", 5000)
+        self.model.data[site]["banned"] = ids
 
     def handle_preset_changed(self, name: str):
-        if name and name in self.model.data["presets"]:
-            self.view.options_tab.selected_preset()
-            self.model.data["preset"] = name
-            preset = self.model.data["presets"][name]
-            self.model.data["game_rules"] = copy.deepcopy(preset["game_rules"])
-            self.model.data["track_rules"] = copy.deepcopy(preset["track_rules"])
-            self.refresh_ui_from_model()
-            if len(self.model.data["presets"]) <= 1:
-                self.view.options_tab.disable_delete_preset()
+        if not name or name not in self.model.get_presets():
+            return
+        preset = self.model.load_preset(name)
+        if not preset:
+            return
+        self.model.config["game_rules"] = preset["game_rules"]
+        self.model.config["track_rules"] = preset["track_rules"]
+        self.refresh_ui_from_model()
 
-    def handle_save_preset(self):
-        name = self.model.data["preset"]
-        self.model.data["presets"][name]["game_rules"] = copy.deepcopy(
-            self.model.data["game_rules"]
-        )
-        self.model.data["presets"][name]["track_rules"] = copy.deepcopy(
-            self.model.data["track_rules"]
-        )
-        self.save_model(silent=True)
+    def handle_save_preset(self, name: str):
+        if name == "New...":
+            new_name = Dialogs.new_preset_name(self.view, self.model.get_presets())
+            if not new_name:
+                self.view.options_tab.populate_presets(self.model.get_presets())
+                return
+            else:
+                name = new_name
+
+        preset = {}
+        preset.update(copy.deepcopy({"game_rules": self.model.config["game_rules"]}))
+        preset.update(copy.deepcopy({"track_rules": self.model.config["track_rules"]}))
+        self.model.save_preset(name, preset)
+        presets = self.model.get_presets()
+        self.view.options_tab.populate_presets(presets)
         self.view.set_status(f"{name} saved!", 3000)
 
-    def handle_new_preset(self, name: str):
-        if name in self.model.data["presets"]:
-            rename = Dialogs.question(
-                self.view,
-                "Duplicate Preset Name",
-                f"Do you want to overwrite preset {name}",
-            )
-            if not rename:
-                return
-
-        self.model.data["presets"][name] = {
-            "game_rules": copy.deepcopy(self.model.data["game_rules"]),
-            "track_rules": copy.deepcopy(self.model.data["track_rules"]),
-        }
-        self.model.data["preset"] = name
-        self.view.options_tab.populate_presets(
-            list(self.model.data["presets"].keys()), name
-        )
-        self.view.options_tab.selected_preset()
-        self.view.options_tab.enable_delete_preset()
-        self.save_model(silent=True)
-        self.view.set_status(f"Preset {name} saved!", 3000)
-
-    def handle_delete_preset(self):
-        name = self.model.data["preset"]
-        if len(self.model.data["presets"]) <= 1:
+    def handle_delete_preset(self, name: str):
+        self.view.options_tab.reset_presets()
+        if len(self.model.get_presets()) < 1:
             return
         reply = Dialogs.question(
             self.view,
@@ -374,61 +297,53 @@ class AppPresenter:
         )
         if not reply:
             return
-        del self.model.data["presets"][name]
-        presets = list(self.model.data["presets"].keys())
-        presets.append("---")
-        self.view.options_tab.populate_presets(presets, "---")
-        self.view.options_tab.deselected_preset()
-        self.model.data["preset"] = presets[0]
-        self.save_model(silent=True)
+
+        self.model.delete_preset(name)
         self.view.set_status(f"{name} deleted.", 3000)
-        if len(self.model.data["presets"]) <= 1:
-            self.view.options_tab.disable_delete_preset()
+        presets = self.model.get_presets()
+        self.view.options_tab.populate_presets(presets)
 
     def handle_game_rule_changed(self, key, val):
-        gr = self.model.data["game_rules"]
+        gr = self.model.config["game_rules"]
         if key == "next_mode":
             gr["next_mode"] = val
         elif key == "site":
             gr["site"] = val
             self.view.options_tab.update_comboboxes(val)
-        elif key == "track_limit_state":
-            gr["track_limit"]["state"] = 2 if val else 0
+        elif key == "track_limit_enabled":
+            gr["track_limit"]["enabled"] = True if val else False
         elif key == "track_limit_val":
             gr["track_limit"]["value"] = val
-        elif key == "time_limit_state":
-            gr["time_limit"]["state"] = 2 if val else 0
+        elif key == "time_limit_enabled":
+            gr["time_limit"]["enabled"] = True if val else False
         elif key == "time_limit_val":
-            gr["time_limit"]["value"] = timedelta(
-                hours=val.hour(), minutes=val.minute(), seconds=val.second()
+            gr["time_limit"]["value"] = datetime(
+                1900, 1, 1, val.hour(), val.minute(), val.second()
             )
 
     def handle_track_rule_changed(self, key, val):
-        track_rule = self.model.data["track_rules"]
-        base_key = key.replace("_state", "").replace("_val", "")
+        track_rule = self.model.config["track_rules"]
+        base_key = key.replace("_enabled", "").replace("_val", "")
         if base_key not in track_rule:
             return
 
-        if key.endswith("_state"):
-            track_rule[base_key]["state"] = 2 if val else 0
+        if key.endswith("_enabled"):
+            track_rule[base_key]["enabled"] = True if val else False
         else:
-            if (
-                "time" in base_key
-                and "inhas" not in base_key
-                and "beaten" not in base_key
-            ):
-                track_rule[base_key]["value"] = val.msecsSinceStartOfDay()
+            if base_key in ["authortimemin", "authortimemax"]:
+                track_rule[base_key]["value"] = datetime(
+                    1900, 1, 1, val.hour(), val.minute(), val.second()
+                )
             elif "uploaded" in base_key:
                 track_rule[base_key]["value"] = datetime.fromtimestamp(
                     val.toSecsSinceEpoch()
                 )
             else:
-                site = self.model.data["game_rules"]["site"]
+                site = self.model.config["game_rules"]["site"]
                 opts = values.get(site, values["all"]).get(
                     base_key, values["all"].get(base_key, [])
                 )
                 opts = [x for x in opts if x != ""]
-                track_rule[base_key]["text"] = val
                 track_rule[base_key]["value"] = opts.index(val) if val in opts else 0
 
     def handle_start_game(self):
@@ -444,63 +359,74 @@ class AppPresenter:
         started = self.session.start(session_config)
         self.progress_timer.start(100)
         if started:
-            self.view.show_game()
-            if self.model.data["force_window_size"]:
-                self.view.setMinimumHeight(220)
-                self.view.setMaximumHeight(220)
+            self.view.game_tab.set_info("")
+            self.view.show_game(self.model.config["force_window_size"])
 
     def handle_stop(self):
         self.progress_timer.stop()
+        self.model.data[self.session.site]["skipped"].extend(list(self.session.skipped))
+
         self.save_model()
-        self.model.save_skipped(self.session.site, self.session.skipped)
         if self.session.stop_reason:
             self.view.set_status(self.session.stop_reason, 5000)
-        self.view.show_config()
-        if self.model.data["force_window_size"]:
-            self.view.setMinimumSize(self.view.minimumSizeHint())
-            self.view.setMaximumSize(self.view.minimumSizeHint())
-
-        if not self.model.data.get("uid_clash", False):
-            return
-
-        clashes = self.session.get_uid_clash()
-        if clashes:
-            site_url = values[self.session.site]["url"]
-            dialog = UidClash(clashes, site_url)
-            if not dialog.exec():
-                return
+        self.view.show_config(self.model.config["force_window_size"])
 
     def generate_session_config(self):
-        if not os.path.exists(self.model.data.get("exe_path", "")):
+        if not os.path.exists(self.model.config.get("exe_path", "")):
             if not self.handle_find_exe():
                 return None
 
-        while not os.path.exists(self.model.data.get("track_dir", "")):
+        while not os.path.exists(self.model.config.get("track_dir", "")):
             if not self.handle_find_track():
                 return None
 
-        config = copy.deepcopy(self.model.data)
+        config = copy.deepcopy(self.model.config.unwrap())
         game_rule = config["game_rules"]
         game_rule["track_limit"] = (
             game_rule["track_limit"]["value"]
-            if game_rule["track_limit"]["state"]
+            if game_rule["track_limit"]["enabled"]
             else None
         )
+        tl = game_rule["time_limit"]["value"]
         game_rule["time_limit"] = (
-            game_rule["time_limit"]["value"]
-            if game_rule["time_limit"]["state"]
+            timedelta(hours=tl.hour, minutes=tl.minute, seconds=tl.second)
+            if game_rule["time_limit"]["enabled"]
             else None
         )
 
         for rule, rule_dict in config["track_rules"].items():
+            if rule in ["authortimemin", "authortimemax"]:
+                value = rule_dict["value"]
+                msecs = (
+                    (value.hour * 3600) + (value.minute * 60) + value.second
+                ) * 1000
+                rule_dict["value"] = msecs
+            elif rule in ["uploadedafter", "uploadedbefore"]:
+                value = rule_dict["value"].timestamp()
+                rule_dict["value"] = datetime.fromtimestamp(value)
+            if rule == "inunlimiter":
+                continue
+            if rule == "unlimiterver":
+                if rule_dict["enabled"]:
+                    config["track_rules"]["inunlimiter"] = 1
+                    if rule_dict["value"] == 0:
+                        rule_dict["enabled"] = False
+                else:
+                    rule_dict[rule] = None
+                    config["track_rules"]["inunlimiter"] = None
+
             config["track_rules"][rule] = (
-                rule_dict["value"] if rule_dict["state"] else None
+                rule_dict["value"] if rule_dict["enabled"] else None
             )
 
-        config["sorted"] = self.model.data["track_rules"]["order1"]["state"]
+        config["sorted"] = self.model.config["track_rules"]["order1"]["enabled"]
         autosave_data = self.model.update_autosave_data()
         config["autosaves"] = autosave_data.get("autosaves", set())
-        config["skipped"] = self.model.load_skipped()
+
+        site_data = copy.deepcopy(self.model.data[game_rule["site"]])
+        config["skipped"] = set(site_data["skipped"])
+        config["banned_tracks"] = set(site_data["banned"])
+
         return config
 
     def update_game_ui(self):
@@ -537,3 +463,7 @@ class AppPresenter:
                 f" | {targ / 1000}s" if targ else ""
             )
             self.view.game_tab.set_info(info)
+
+        if self.model.config["force_window_size"]:
+            self.view.setMinimumHeight(220)
+            self.view.setMaximumHeight(220)
