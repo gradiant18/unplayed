@@ -9,4 +9,4 @@ clean:
 	rm -f *.spec *.bin *.log *_skipped.txt
 
 build: ./src/*
-	python -m nuitka --follow-imports --output-filename=unplayed src/main.py
+	python -m nuitka --standalone --onefile --enable-plugin=pyqt6 --remove-output --output-filename=unplayed src/main.py
