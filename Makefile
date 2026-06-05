@@ -9,4 +9,4 @@ clean:
 	rm -f *.spec *.bin *.log *_skipped.txt
 
 build: ./src/*
-	pyinstaller ./src/main.py -F --noconsole --name "unplayed"
+	python -m nuitka --follow-imports --output-filename=unplayed src/main.py
