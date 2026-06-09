@@ -12,7 +12,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-22.04
             platform_name: linux
             exec_ext: ""
             nuitka_flags: "--enable-plugin=pyqt6"
@@ -36,9 +36,10 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          pip install nuitka ordered-set
+          pip install "nuitka[onefile]" ordered-set
 
       - name: Build with Nuitka
+        shell: bash
         run: |
           python -m nuitka --standalone \
                            --onefile \
@@ -50,12 +51,11 @@ jobs:
       - name: Prepare Folder and Archive
         shell: bash
         run: |
-          mkdir unplayed_folder
-          mv unplayed${{ matrix.exec_ext }} unplayed_folder/unplayed${{ matrix.exec_ext }}
-          mv unplayed_folder unplayed
-
+          mkdir unplayed
+          mv unplayed${{ matrix.exec_ext }} unplayed/
+          
           if [[ "${{ matrix.platform_name }}" == "windows" ]]; then
-            powershell Compress-Archive -Path unplayed -DestinationPath unplayed-${{ matrix.platform_name }}-${{ github.event.inputs.version }}.zip
+            zip -r unplayed-${{ matrix.platform_name }}-${{ github.event.inputs.version }}.zip unplayed/
           else
             zip -r unplayed-${{ matrix.platform_name }}-${{ github.event.inputs.version }}.zip unplayed/
           fi
@@ -73,16 +73,10 @@ jobs:
       contents: write
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
           merge-multiple: true
-
-      - name: List files
-        run: ls -R
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
