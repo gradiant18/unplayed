@@ -4,14 +4,22 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Enter version number"
+        description: "Enter version number (e.g., v1.0.0)"
         required: true
 
 jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        include:
+          - os: ubuntu-22.04
+            platform_name: linux
+            exec_ext: ""
+            nuitka_flags: "--enable-plugin=pyqt6"
+          - os: windows-latest
+            platform_name: windows
+            exec_ext: ".exe"
+            nuitka_flags: "--enable-plugin=pyqt6 --windows-console-mode=disable --windows-icon-from-ico=assets/icon.ico"
 
     runs-on: ${{ matrix.os }}
 
@@ -20,49 +28,57 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: 'pip'
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Build executable
-        run: pyinstaller --name "unplayed" --onefile --noconsole src/main.py
-
-      - name: Rename executable
         run: |
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            mv dist/unplayed.exe dist/unplayed-windows-${{ github.event.inputs.version }}.exe
-          elif [[ "$RUNNER_OS" == "Linux" ]]; then
-            mv dist/unplayed dist/unplayed-linux-${{ github.event.inputs.version }}
-          fi
+          pip install -r requirements.txt
+          pip install "nuitka[onefile]" ordered-set
+
+      - name: Build with Nuitka
         shell: bash
+        run: |
+          python -m nuitka --standalone \
+                           --onefile \
+                           --remove-output \
+                           --assume-yes-for-downloads \
+                           ${{ matrix.nuitka_flags }} \
+                           --output-filename=unplayed \
+                           src/main.py
+
+      - name: Prepare Folder and Archive
+        shell: bash
+        run: |
+          mkdir temp_out
+          mv unplayed${{ matrix.exec_ext }} temp_out/
+          mv temp_out unplayed
+
+          if [[ "${{ matrix.platform_name }}" == "windows" ]]; then
+            7z a unplayed-${{ matrix.platform_name }}-${{ github.event.inputs.version }}.zip unplayed/
+          else
+            zip -r unplayed-${{ matrix.platform_name }}-${{ github.event.inputs.version }}.zip unplayed/
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: unplayed-${{ matrix.os }}
-          path: dist/*
+          name: unplayed-${{ matrix.platform_name }}
+          path: unplayed-${{ matrix.platform_name }}-${{ github.event.inputs.version }}.zip
 
   release:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
           merge-multiple: true
-
-      - name: List downloaded files (Debugging)
-        run: ls -R
-
-      - name: Make files executable (Linux)
-        run: chmod +x unplayed-* || true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -72,5 +88,5 @@ jobs:
           draft: true
           prerelease: false
           files: |
-            unplayed-linux-${{ github.event.inputs.version }}
-            unplayed-windows-${{ github.event.inputs.version }}.exe
+            unplayed-linux-${{ github.event.inputs.version }}.zip
+            unplayed-windows-${{ github.event.inputs.version }}.zip

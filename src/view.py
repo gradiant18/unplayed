@@ -1,6 +1,7 @@
 import re
 
 from PyQt6.QtCore import QDateTime, Qt, QTime, pyqtSignal
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -667,6 +668,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Unplayed")
+        self.setWindowIcon(QIcon("assets/icon.ico"))
         self.status = QStatusBar()
         self.setStatusBar(self.status)
 
