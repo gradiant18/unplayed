@@ -2,7 +2,7 @@ BINARY_NAME = unplayed
 MAIN_FILE = src/main.py
 
 ifeq ($(OS),Windows_NT)
-    VENV_PYTHON = .venv\Scripts\python.exe
+    VENV_PYTHON = venv\Scripts\python.exe
     RM = del /S /Q
     RMDIR = rmdir /S /Q
     MOVE = move /Y
@@ -10,7 +10,7 @@ ifeq ($(OS),Windows_NT)
     EXE_EXT = .exe
     PLATFORM_FLAGS = --windows-disable-console --enable-plugin=pyqt6 --windows-icon-from-ico=assets/icon.ico
 else
-    VENV_PYTHON = ./.venv/bin/python3
+    VENV_PYTHON = ./venv/bin/python3
     RM = rm -f
     RMDIR = rm -rf
     MOVE = mv -f
