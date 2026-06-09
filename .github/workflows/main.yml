@@ -61,7 +61,12 @@ jobs:
           mkdir temp_out
           mv unplayed${{ matrix.exec_ext }} temp_out/
           mv temp_out unplayed
-          zip -r unplayed-${{ matrix.platform_name }}-${{ github.event.inputs.version }}.zip unplayed/
+
+          if [[ "${{ matrix.platform_name }}" == "windows" ]]; then
+            7z a unplayed-${{ matrix.platform_name }}-${{ github.event.inputs.version }}.zip unplayed/
+          else
+            zip -r unplayed-${{ matrix.platform_name }}-${{ github.event.inputs.version }}.zip unplayed/
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
