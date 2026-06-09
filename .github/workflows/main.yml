@@ -38,12 +38,6 @@ jobs:
           pip install -r requirements.txt
           pip install "nuitka[onefile]" ordered-set
 
-      - name: Nuitka Cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ github.workspace }}/.nuitka-cache
-          key: ${{ runner.os }}-nuitka-${{ hashFiles('**/requirements.txt') }}
-
       - name: Build with Nuitka
         shell: bash
         run: |
