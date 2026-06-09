@@ -5,7 +5,7 @@ AUTOSAVE_FILE = "autosaves.txt"
 CONFIG_FILE = "config.toml"
 DATA_FILE = "data.json"
 DOWNLOAD_DIR = "Unplayed"
-LOG_FILE = "unplayed.log"
+LOG_FILE = "log.log"
 PRESETS_DIR = "presets"
 
 values = {

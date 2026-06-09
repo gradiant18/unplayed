@@ -8,7 +8,9 @@ ifeq ($(OS),Windows_NT)
     MOVE = move /Y
     MKDIR = mkdir
     EXE_EXT = .exe
-    PLATFORM_FLAGS = --windows-disable-console --enable-plugin=pyqt6 --windows-icon-from-ico=assets/icon.ico
+    PLATFORM_FLAGS = --windows-disable-console \
+                     --enable-plugin=pyqt6 \
+                     --windows-icon-from-ico=assets/icon.ico
 else
     VENV_PYTHON = ./venv/bin/python3
     RM = rm -f
@@ -41,4 +43,5 @@ build:
 		--output-filename=$(BINARY_NAME) \
 		$(MAIN_FILE)
 	-$(MKDIR) dist
+	$(RM) dist/$(BINARY_NAME)$(EXE_EXT)
 	$(MOVE) $(BINARY_NAME)$(EXE_EXT) dist/$(BINARY_NAME)$(EXE_EXT)
