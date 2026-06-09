@@ -19,7 +19,7 @@ jobs:
           - os: windows-latest
             platform_name: windows
             exec_ext: ".exe"
-            nuitka_flags: "--enable-plugin=pyqt6 --windows-disable-console --windows-icon-from-ico=assets/icon.ico"
+            nuitka_flags: "--enable-plugin=pyqt6 --windows-console-mode=disable --windows-icon-from-ico=assets/icon.ico"
 
     runs-on: ${{ matrix.os }}
 
@@ -38,12 +38,20 @@ jobs:
           pip install -r requirements.txt
           pip install "nuitka[onefile]" ordered-set
 
+      - name: Nuitka Cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.nuitka-cache
+          key: ${{ runner.os }}-nuitka-${{ hashFiles('**/requirements.txt') }}
+
       - name: Build with Nuitka
         shell: bash
         run: |
           python -m nuitka --standalone \
                            --onefile \
                            --remove-output \
+                           --assume-yes-for-downloads \
+                           --user-package-configuration-file-cache-path=.nuitka-cache \
                            ${{ matrix.nuitka_flags }} \
                            --output-filename=unplayed \
                            src/main.py
@@ -53,12 +61,7 @@ jobs:
         run: |
           mkdir unplayed
           mv unplayed${{ matrix.exec_ext }} unplayed/
-          
-          if [[ "${{ matrix.platform_name }}" == "windows" ]]; then
-            zip -r unplayed-${{ matrix.platform_name }}-${{ github.event.inputs.version }}.zip unplayed/
-          else
-            zip -r unplayed-${{ matrix.platform_name }}-${{ github.event.inputs.version }}.zip unplayed/
-          fi
+          zip -r unplayed-${{ matrix.platform_name }}-${{ github.event.inputs.version }}.zip unplayed/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
