@@ -58,8 +58,9 @@ jobs:
       - name: Prepare Folder and Archive
         shell: bash
         run: |
-          mkdir unplayed
-          mv unplayed${{ matrix.exec_ext }} unplayed/
+          mkdir temp_out
+          mv unplayed${{ matrix.exec_ext }} temp_out/
+          mv temp_out unplayed
           zip -r unplayed-${{ matrix.platform_name }}-${{ github.event.inputs.version }}.zip unplayed/
 
       - name: Upload artifact
