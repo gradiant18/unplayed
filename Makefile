@@ -14,7 +14,7 @@ else
     RM = rm -f
     RMDIR = rm -rf
     MOVE = mv -f
-    MKDIR = mkdir
+    MKDIR = mkdir -p
     EXE_EXT = 
     PLATFORM_FLAGS = --enable-plugin=pyqt6
 endif
@@ -40,6 +40,5 @@ build:
 	$(VENV_PYTHON) -m nuitka $(NUITKA_FLAGS) \
 		--output-filename=$(BINARY_NAME) \
 		$(MAIN_FILE)
-	$(RMDIR) dist
-	$(MKDIR) dist
+	-$(MKDIR) dist
 	$(MOVE) $(BINARY_NAME)$(EXE_EXT) dist/$(BINARY_NAME)$(EXE_EXT)
