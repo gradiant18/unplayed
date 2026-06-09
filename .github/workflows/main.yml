@@ -51,7 +51,6 @@ jobs:
                            --onefile \
                            --remove-output \
                            --assume-yes-for-downloads \
-                           --user-package-configuration-file-cache-path=.nuitka-cache \
                            ${{ matrix.nuitka_flags }} \
                            --output-filename=unplayed \
                            src/main.py
