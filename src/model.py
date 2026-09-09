@@ -190,12 +190,8 @@ class ConfigModel:
             log(f"Error saving to {AUTOSAVE_FILE}: {e}")
 
     def delete_files(self):
-        files = [
-            "config.toml",
-            "data.json",
-            "autosaves.txt",
-            "log.log",
-        ]
+        """Deletes generated files"""
+        files = [CONFIG_FILE, AUTOSAVE_FILE, DATA_FILE]
         for file in files:
             if os.path.exists(file):
                 os.remove(file)

@@ -46,7 +46,7 @@ class AppPresenter:
         self.view.settings_tab.find_track.connect(self.handle_find_track)
         self.view.settings_tab.rescan_autosaves.connect(self.handle_rescan_autosaves)
         self.view.settings_tab.save_requested.connect(self.save_model)
-        self.view.settings_tab.delete_data_requested.connect(self.handle_delete_data)
+        self.view.settings_tab.reset_requested.connect(self.handle_reset)
 
         self.view.banned_tab.save_requested.connect(self.save_model)
         self.view.banned_tab.clear_requested.connect(self.handle_banned_clear)
@@ -83,9 +83,9 @@ class AppPresenter:
     def save_model(self, silent=False):
         if not silent:
             self.view.set_status("Saving...")
+        self.model.save_autosaves()
         self.model.save_config()
         self.model.save_data()
-        self.model.save_autosaves()
         if not silent:
             self.view.set_status("Saved!", 3000)
 
@@ -201,13 +201,28 @@ class AppPresenter:
         return True
 
     def handle_rescan_autosaves(self):
+        if not self.model.config["track_dir"]:
+            if not self.handle_find_track():
+                self.view.set_status("Canceled")
+                self.view.show_error(
+                    "No Path", "Can't scan replays without a path to scan."
+                )
+                return
+
         self.view.set_status("Scanning...")
         total = self.model.rescan_autosaves()
-        self.view.set_status(f"Found {total} replays!", 3000)
+        if total == 0:
+            self.view.set_status("No replays :(", 3000)
+        if total == 1:
+            self.view.set_status("Found 1 replay!", 3000)
+        else:
+            self.view.set_status(f"Found {total} replays!", 3000)
 
-    def handle_delete_data(self):
+    def handle_reset(self):
         reply = Dialogs.question(
-            self.view, "Delete Data", "Are you sure you want to delete all data?"
+            self.view,
+            "Reset To Defaults",
+            "Are you sure you want to reset to defaults?",
         )
         if not reply:
             self.view.set_status("Canceled.", 3000)
@@ -218,7 +233,7 @@ class AppPresenter:
         self.model.data = self.model.load_data()
         self.save_model(silent=True)
         self.refresh_ui_from_model()
-        self.view.set_status("Deleted.", 3000)
+        self.view.set_status("Reset", 3000)
 
     def handle_banned_clear(self):
         reply = Dialogs.question(
