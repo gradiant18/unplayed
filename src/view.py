@@ -250,7 +250,7 @@ class OptionsTab(QWidget):
         self.preset_combo.addItems(["Load"])
         self.preset_combo.currentTextChanged.connect(self.preset_loaded.emit)
         self.save_preset = QComboBox()
-        self.save_preset.addItems(["Save", "New..."])
+        self.save_preset.addItems(["Save As", "New..."])
         self.save_preset.currentTextChanged.connect(self.save_preset_requested.emit)
         self.del_preset = QComboBox()
         self.del_preset.addItems(["Delete"])
@@ -436,7 +436,7 @@ class OptionsTab(QWidget):
 
         presets.sort()
         self.preset_combo.addItems(["Load"] + presets)
-        self.save_preset.addItems(["Save"] + presets + ["New..."])
+        self.save_preset.addItems(["Save As"] + presets + ["New..."])
         self.del_preset.addItems(["Delete"] + presets)
 
         self.preset_combo.blockSignals(False)
