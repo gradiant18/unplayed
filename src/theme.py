@@ -233,9 +233,6 @@ class _DialogButtonCleanFilter(QObject):
 
 
 def apply_theme(app):
-    """Applies the dark theme stylesheet and removes washed-out OS icons from dialogs."""
-    global _filter_instance
-
     attr = getattr(Qt.ApplicationAttribute, "AA_DontShowIconsInMenus", None) or getattr(
         Qt, "AA_DontShowIconsInMenus", None
     )
