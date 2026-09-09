@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import QApplication
 from model import ConfigModel
 from presenter import AppPresenter
 from view import MainWindow
+from theme import apply_theme
 
 
 def main():
@@ -16,6 +17,7 @@ def main():
     args = parser.parse_args()
 
     app = QApplication(sys.argv)
+    apply_theme(app)
     model = ConfigModel(args.nolaunch)
     view = MainWindow()
     presenter = AppPresenter(model, view)
