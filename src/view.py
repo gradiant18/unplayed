@@ -90,11 +90,11 @@ class FindPath(QDialog):
 
 class SettingsTab(QWidget):
     settings_changed = pyqtSignal(dict)
-    delete_data_requested = pyqtSignal()
-    rescan_autosaves = pyqtSignal()
-    save_requested = pyqtSignal()
     find_exe = pyqtSignal()
     find_track = pyqtSignal()
+    reset_requested = pyqtSignal()
+    rescan_autosaves = pyqtSignal()
+    save_requested = pyqtSignal()
 
     def __init__(self):
         super().__init__()
@@ -138,9 +138,9 @@ class SettingsTab(QWidget):
         btn_scan.clicked.connect(self.rescan_autosaves.emit)
         layout.addWidget(btn_scan)
 
-        btn_delete = QPushButton("Delete all data")
-        btn_delete.clicked.connect(self.delete_data_requested.emit)
-        layout.addWidget(btn_delete)
+        btn_reset = QPushButton("Reset To Defaults")
+        btn_reset.clicked.connect(self.reset_requested.emit)
+        layout.addWidget(btn_reset)
 
         btn_save = QPushButton("Save")
         btn_save.clicked.connect(self.save_requested.emit)
