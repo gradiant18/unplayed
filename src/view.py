@@ -3,6 +3,7 @@ import re
 from PyQt6.QtCore import QDateTime, Qt, QTime, pyqtSignal
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QComboBox,
     QDateTimeEdit,
@@ -95,11 +96,13 @@ class SettingsTab(QWidget):
     reset_requested = pyqtSignal()
     rescan_autosaves = pyqtSignal()
     save_requested = pyqtSignal()
+    theme_changed = pyqtSignal(str)
 
     def __init__(self):
         super().__init__()
         layout = QVBoxLayout()
 
+        check_column = QVBoxLayout()
         self.forced_window = QCheckBox("Force Window Size")
         self.auto_update = QCheckBox("Auto Update Banned Tracks")
         self.skip_skipped = QCheckBox("Don't Play Skipped Tracks")
@@ -112,9 +115,18 @@ class SettingsTab(QWidget):
 
         for checkbox in self.checkboxes:
             checkbox.stateChanged.connect(self._emit_settings)
-            layout.addWidget(checkbox)
+            check_column.addWidget(checkbox)
+        layout.addLayout(check_column)
 
-        # Exe path
+        theme_row = QHBoxLayout()
+        theme_lbl = QLabel("Theme: ")
+        theme_row.addWidget(theme_lbl)
+        self.theme_combo = QComboBox()
+        self.theme_combo.currentTextChanged.connect(self.theme_changed.emit)
+        theme_row.addWidget(self.theme_combo)
+        theme_row.addStretch()
+        layout.addLayout(theme_row)
+
         paths_layout = QGridLayout()
         self.exe_edit = QLineEdit()
         self.exe_edit.textEdited.connect(self._emit_settings)
@@ -124,7 +136,6 @@ class SettingsTab(QWidget):
         paths_layout.addWidget(self.exe_edit, 0, 1)
         paths_layout.addWidget(btn_exe, 0, 2)
 
-        # Track dir
         self.dir_edit = QLineEdit()
         self.dir_edit.textEdited.connect(self._emit_settings)
         btn_dir = QPushButton("Find")
@@ -164,6 +175,17 @@ class SettingsTab(QWidget):
             checkbox.blockSignals(False)
         self.exe_edit.blockSignals(False)
         self.dir_edit.blockSignals(False)
+
+    def populate_themes(self, themes: list, config_data: dict):
+        """Populates list of themes"""
+        self.theme_combo.blockSignals(True)
+        themes.sort()
+        if "Default" in themes:
+            themes.remove("Default")
+        self.theme_combo.clear()
+        self.theme_combo.addItems(["Default"] + themes)
+        self.theme_combo.setCurrentText(config_data.get("theme", "Default"))
+        self.theme_combo.blockSignals(False)
 
     def _emit_settings(self):
         """Emits checkbox states and text edit text"""
@@ -685,6 +707,9 @@ class MainWindow(QMainWindow):
         self.game_tab = GameTab()
         self.stacked.addWidget(self.game_tab)
 
+    def apply_theme(self, theme):
+        QApplication.instance().setStyleSheet(theme)
+
     def set_status(self, msg, timeout=0):
         self.status.showMessage(msg, timeout)
 
@@ -700,5 +725,5 @@ class MainWindow(QMainWindow):
     def show_config(self, force_window_size=True):
         self.stacked.setCurrentIndex(0)
         if force_window_size:
-            self.setMinimumSize(self.minimumSizeHint())
-            self.setMaximumSize(self.minimumSizeHint())
+            self.setMinimumSize(473, 529)
+            self.setMaximumSize(473, 529)
