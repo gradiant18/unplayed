@@ -1,4 +1,39 @@
-QWidget {
+default_theme = """QPushButton#btn_start {    background-color: #238636;
+    color: #FFFFFF;
+    border: 1px solid #2EA043;
+    padding: 3px;
+    border-radius: 3px;
+}
+QPushButton#btn_start:hover { background-color: #2EA043; }
+
+QPushButton#btn_reload {
+    background-color: #ECD922; 
+    color: #000000; 
+    border: 1px solid #EFEF21;
+    padding: 3px;
+    border-radius: 3px;
+}
+QPushButton#btn_reload:hover { background-color: #EFEF21; }
+
+QPushButton#btn_skip {
+    background-color: #DB6D28;
+    color: #000000;
+    border: 1px solid #F0883E;
+    padding: 3px;
+    border-radius: 3px;
+}
+QPushButton#btn_skip:hover { background-color: #F0883E; }
+
+QPushButton#btn_stop {
+    background-color: #DA3633;
+    color: #000000;
+    border: 1px solid #F85149;
+    padding: 3px;
+    border-radius: 3px;
+}
+QPushButton#btn_stop:hover { background-color: #F85149; }"""
+
+dark_theme = """QWidget {
     background-color: #0A0C10;
     color: #E6EDF3;
     font-family: "JetBrains Mono", "Consolas", "Segoe UI", monospace, sans-serif;
@@ -281,4 +316,4 @@ QStatusBar {
     background-color: #07080B;
     color: #7D8590;
     border-top: 1px solid #1E232E;
-}
+}"""

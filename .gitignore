@@ -5,6 +5,7 @@ build/
 dist/
 unplayed/
 presets/
+themes/
 *.json
 *.toml
 *.yaml

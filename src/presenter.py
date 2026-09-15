@@ -74,7 +74,10 @@ class AppPresenter:
         self.view.settings_tab.populate_themes(
             self.model.get_themes(), self.model.config
         )
-        self.view.apply_theme(self.model.load_theme(self.model.config.get("theme", "")))
+        theme = self.model.config.get("theme", "")
+        if theme not in self.model.get_themes():
+            theme = "Default"
+        self.view.apply_theme(self.model.load_theme(theme))
         self.view.banned_tab.populate(self.model.data)
 
         self.view.options_tab.populate_presets(self.model.get_presets())
@@ -245,11 +248,9 @@ class AppPresenter:
 
     def handle_theme_change(self, name):
         theme = self.model.load_theme(name)
-        self.view.apply_theme(theme)
+        if theme:
+            self.view.apply_theme(theme)
         self.model.config["theme"] = name
-        if self.model.config["force_window_size"] and False:
-            self.view.setMinimumSize(473, 529)
-            self.view.setMaximumSize(473, 529)
 
     def handle_banned_clear(self):
         reply = Dialogs.question(
@@ -298,10 +299,8 @@ class AppPresenter:
             return
         self.model.config["game_rules"] = preset["game_rules"]
         self.model.config["track_rules"] = preset["track_rules"]
-        print(self.view.width(), self.view.height())
         self.refresh_ui_from_model()
         self.view.set_status(f"Loaded {name}", 3000)
-        print(self.view.width(), self.view.height())
 
     def handle_save_preset(self, name: str):
         if name == "New...":
