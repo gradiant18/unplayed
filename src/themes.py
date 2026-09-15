@@ -1,4 +1,4 @@
-default_theme = """QPushButton#btn_start {    background-color: #238636;
+classic_theme = """QPushButton#btn_start {    background-color: #238636;
     color: #FFFFFF;
     border: 1px solid #2EA043;
     padding: 3px;

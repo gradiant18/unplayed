@@ -32,7 +32,7 @@ from common import (
     THEMES_DIR,
 )
 
-from themes import default_theme, dark_theme
+from themes import classic_theme, dark_theme
 
 
 class ConfigModel:
@@ -94,9 +94,9 @@ class ConfigModel:
     def get_themes(self) -> list[str]:
         if not os.path.exists(THEMES_DIR):
             os.mkdir(THEMES_DIR)
-        if not os.path.exists(os.path.join(THEMES_DIR, "Default.qss")):
-            with open(os.path.join(THEMES_DIR, "Default.qss"), "w") as file:
-                file.write(default_theme)
+        if not os.path.exists(os.path.join(THEMES_DIR, "Classic.qss")):
+            with open(os.path.join(THEMES_DIR, "Classic.qss"), "w") as file:
+                file.write(classic_theme)
         if not os.path.exists(os.path.join(THEMES_DIR, "Dark.qss")):
             with open(os.path.join(THEMES_DIR, "Dark.qss"), "w") as file:
                 file.write(dark_theme)

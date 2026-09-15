@@ -180,11 +180,9 @@ class SettingsTab(QWidget):
         """Populates list of themes"""
         self.theme_combo.blockSignals(True)
         themes.sort()
-        if "Default" in themes:
-            themes.remove("Default")
         self.theme_combo.clear()
-        self.theme_combo.addItems(["Default"] + themes)
-        self.theme_combo.setCurrentText(config_data.get("theme", "Default"))
+        self.theme_combo.addItems(themes)
+        self.theme_combo.setCurrentText(config_data.get("theme", ""))
         self.theme_combo.blockSignals(False)
 
     def _emit_settings(self):
