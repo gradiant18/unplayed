@@ -718,14 +718,21 @@ class MainWindow(QMainWindow):
 
     def show_game(self, force_window_size=True):
         self.stacked.setCurrentIndex(1)
+        game_min = self.game_tab.minimumSizeHint()
         if force_window_size:
-            self.setMinimumHeight(220)
-            self.setMaximumHeight(220)
+            self.setMinimumHeight(int(game_min.height() * 1.15))
+            self.setMaximumHeight(int(game_min.height() * 1.15))
+        else:
+            self.setMinimumHeight(game_min.height())
+            self.setMaximumHeight(16777215)
 
     def show_config(self, force_window_size=True):
         self.stacked.setCurrentIndex(0)
         if force_window_size:
             self.set_window_size()
+        else:
+            self.setMinimumSize(self.game_tab.minimumSizeHint())
+            self.setMaximumSize(16777215, 16777215)
 
     def set_window_size(self):
         if self.window_size:

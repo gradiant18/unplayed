@@ -247,7 +247,8 @@ class AppPresenter:
         theme = self.model.load_theme(name)
         if theme:
             self.view.apply_theme(theme)
-            self.view.set_window_size()
+            if self.model.config["force_window_size"]:
+                self.view.set_window_size()
         self.model.config["theme"] = name
 
     def handle_banned_clear(self):
@@ -494,7 +495,3 @@ class AppPresenter:
                 f" | {targ / 1000}s" if targ else ""
             )
             self.view.game_tab.set_info(info)
-
-        if self.model.config["force_window_size"]:
-            self.view.setMinimumHeight(220)
-            self.view.setMaximumHeight(220)
