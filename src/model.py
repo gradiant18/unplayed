@@ -29,7 +29,10 @@ from common import (
     DOWNLOAD_DIR,
     LOG_FILE,
     PRESETS_DIR,
+    THEMES_DIR,
 )
+
+from themes import classic_theme, dark_theme
 
 
 class ConfigModel:
@@ -80,13 +83,39 @@ class ConfigModel:
     def save_data(self):
         data = copy.deepcopy(self.data)
         for site in data:
-            data[site]["skipped"] = list(set(data[site]["skipped"]))
-            data[site]["banned"] = list(set(data[site]["banned"]))
+            data[site]["skipped"] = sorted(list(set(data[site]["skipped"])))
+            data[site]["banned"] = sorted(list(set(data[site]["banned"])))
         try:
             with open(DATA_FILE, "w") as file:
                 json.dump(data, file, indent=2)
         except AttributeError as e:
             log(f"Error saving {DATA_FILE}: {e}")
+
+    def get_themes(self) -> list[str]:
+        if not os.path.exists(THEMES_DIR):
+            os.mkdir(THEMES_DIR)
+        if not os.path.exists(os.path.join(THEMES_DIR, "Classic.qss")):
+            with open(os.path.join(THEMES_DIR, "Classic.qss"), "w") as file:
+                file.write(classic_theme)
+        if not os.path.exists(os.path.join(THEMES_DIR, "Dark.qss")):
+            with open(os.path.join(THEMES_DIR, "Dark.qss"), "w") as file:
+                file.write(dark_theme)
+        themes = [
+            file
+            for _, _, files in os.walk(THEMES_DIR)
+            for file in files
+            if file.endswith(".qss")
+        ]
+        return [os.path.basename(file)[:-4] for file in themes]
+
+    def load_theme(self, name: str):
+        """Loads theme from file"""
+        try:
+            with open(os.path.join(THEMES_DIR, f"{name}.qss")) as file:
+                return file.read()
+        except Exception as e:
+            log(f"Error loading {os.path.join(THEMES_DIR, f'{name}.qss')}: {e}")
+            return
 
     def get_presets(self) -> list[str]:
         # NOTE: verify presets?

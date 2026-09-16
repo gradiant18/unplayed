@@ -35,6 +35,7 @@ class AppPresenter:
 
         self.connect_signals()
         self.refresh_ui_from_model()
+        self.view.window_size = self.view.minimumSizeHint()
 
         if "default_data" in self.model.config.keys():
             del self.model.config["default_data"]
@@ -47,6 +48,7 @@ class AppPresenter:
         self.view.settings_tab.rescan_autosaves.connect(self.handle_rescan_autosaves)
         self.view.settings_tab.save_requested.connect(self.save_model)
         self.view.settings_tab.reset_requested.connect(self.handle_reset)
+        self.view.settings_tab.theme_changed.connect(self.handle_theme_change)
 
         self.view.banned_tab.save_requested.connect(self.save_model)
         self.view.banned_tab.clear_requested.connect(self.handle_banned_clear)
@@ -66,19 +68,24 @@ class AppPresenter:
         self.view.game_tab.stop_requested.connect(lambda: self.session.stop())
 
     def refresh_ui_from_model(self):
-        if self.model.config["force_window_size"]:
-            self.view.setMinimumSize(self.view.minimumSizeHint())
-            self.view.setMaximumSize(self.view.minimumSizeHint())
-
         self.view.settings_tab.populate(self.model.config)
+        self.view.settings_tab.populate_themes(
+            self.model.get_themes(), self.model.config
+        )
+        theme = self.model.config.get("theme", "")
+        if theme not in self.model.get_themes():
+            theme = "Default"
+        self.view.apply_theme(self.model.load_theme(theme))
         self.view.banned_tab.populate(self.model.data)
-
         self.view.options_tab.populate_presets(self.model.get_presets())
 
         game_rules = self.model.config["game_rules"]
         track_rules = self.model.config["track_rules"]
         self.view.options_tab.update_comboboxes(game_rules["site"])
         self.view.options_tab.populate_rules(game_rules, track_rules)
+
+        if self.model.config["force_window_size"]:
+            self.view.set_window_size()
 
     def save_model(self, silent=False):
         if not silent:
@@ -90,14 +97,15 @@ class AppPresenter:
             self.view.set_status("Saved!", 3000)
 
     def handle_settings_changed(self, new_settings):
+        old = self.model.config["force_window_size"]
         self.model.config.update(new_settings)
-        if self.model.config["force_window_size"]:
-            hint = self.view.minimumSizeHint()
-            self.view.setFixedSize(hint)
-        else:
-            self.view.setMinimumSize(0, 0)
-            self.view.setMaximumSize(16777215, 16777215)
+        if self.model.config["force_window_size"] != old:
             self.view.hide()
+            if self.model.config["force_window_size"]:
+                self.view.set_window_size()
+            else:
+                self.view.setMinimumSize(0, 0)
+                self.view.setMaximumSize(16777215, 16777215)
             self.view.show()
 
     def handle_find_exe(self):
@@ -235,6 +243,14 @@ class AppPresenter:
         self.refresh_ui_from_model()
         self.view.set_status("Reset", 3000)
 
+    def handle_theme_change(self, name):
+        theme = self.model.load_theme(name)
+        if theme:
+            self.view.apply_theme(theme)
+            if self.model.config["force_window_size"]:
+                self.view.set_window_size()
+        self.model.config["theme"] = name
+
     def handle_banned_clear(self):
         reply = Dialogs.question(
             self.view,
@@ -260,7 +276,7 @@ class AppPresenter:
 
     def _on_banned_update_success(self, data: dict):
         for site, ids in data.items():
-            self.model.data[site]["banned"] = set(ids)
+            self.model.data[site]["banned"] = sorted(list(set(ids)))
         self.view.banned_tab.populate(self.model.data)
         self.save_model()
         self.view.set_status("Updated!", 3000)
@@ -283,6 +299,7 @@ class AppPresenter:
         self.model.config["game_rules"] = preset["game_rules"]
         self.model.config["track_rules"] = preset["track_rules"]
         self.refresh_ui_from_model()
+        self.view.set_status(f"Loaded {name}", 3000)
 
     def handle_save_preset(self, name: str):
         if name == "New...":
@@ -478,7 +495,3 @@ class AppPresenter:
                 f" | {targ / 1000}s" if targ else ""
             )
             self.view.game_tab.set_info(info)
-
-        if self.model.config["force_window_size"]:
-            self.view.setMinimumHeight(220)
-            self.view.setMaximumHeight(220)

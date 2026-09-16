@@ -7,6 +7,7 @@ DATA_FILE = "data.json"
 DOWNLOAD_DIR = "Unplayed"
 LOG_FILE = "log.log"
 PRESETS_DIR = "presets"
+THEMES_DIR = "themes"
 
 values = {
     "all": {

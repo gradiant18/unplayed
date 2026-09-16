@@ -3,6 +3,7 @@ import re
 from PyQt6.QtCore import QDateTime, Qt, QTime, pyqtSignal
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QComboBox,
     QDateTimeEdit,
@@ -95,11 +96,13 @@ class SettingsTab(QWidget):
     reset_requested = pyqtSignal()
     rescan_autosaves = pyqtSignal()
     save_requested = pyqtSignal()
+    theme_changed = pyqtSignal(str)
 
     def __init__(self):
         super().__init__()
         layout = QVBoxLayout()
 
+        check_column = QVBoxLayout()
         self.forced_window = QCheckBox("Force Window Size")
         self.auto_update = QCheckBox("Auto Update Banned Tracks")
         self.skip_skipped = QCheckBox("Don't Play Skipped Tracks")
@@ -112,9 +115,18 @@ class SettingsTab(QWidget):
 
         for checkbox in self.checkboxes:
             checkbox.stateChanged.connect(self._emit_settings)
-            layout.addWidget(checkbox)
+            check_column.addWidget(checkbox)
+        layout.addLayout(check_column)
 
-        # Exe path
+        theme_row = QHBoxLayout()
+        theme_lbl = QLabel("Theme: ")
+        theme_row.addWidget(theme_lbl)
+        self.theme_combo = QComboBox()
+        self.theme_combo.currentTextChanged.connect(self.theme_changed.emit)
+        theme_row.addWidget(self.theme_combo)
+        theme_row.addStretch()
+        layout.addLayout(theme_row)
+
         paths_layout = QGridLayout()
         self.exe_edit = QLineEdit()
         self.exe_edit.textEdited.connect(self._emit_settings)
@@ -124,7 +136,6 @@ class SettingsTab(QWidget):
         paths_layout.addWidget(self.exe_edit, 0, 1)
         paths_layout.addWidget(btn_exe, 0, 2)
 
-        # Track dir
         self.dir_edit = QLineEdit()
         self.dir_edit.textEdited.connect(self._emit_settings)
         btn_dir = QPushButton("Find")
@@ -149,14 +160,13 @@ class SettingsTab(QWidget):
         self.setLayout(layout)
 
     def populate(self, config_data: dict):
-        """Populates checkboxes and text exits from config_data"""
+        """Populates checkboxes and text edits from config_data"""
         for checkbox in self.checkboxes:
             checkbox.blockSignals(True)
         self.exe_edit.blockSignals(True)
         self.dir_edit.blockSignals(True)
 
         for checkbox, key in self.checkboxes.items():
-            # FIX: if error set to proper default
             checkbox.setChecked(config_data.get(key, True))
         self.exe_edit.setText(config_data.get("exe_path", "bad"))
         self.dir_edit.setText(config_data.get("track_dir", "bad"))
@@ -165,6 +175,15 @@ class SettingsTab(QWidget):
             checkbox.blockSignals(False)
         self.exe_edit.blockSignals(False)
         self.dir_edit.blockSignals(False)
+
+    def populate_themes(self, themes: list, config_data: dict):
+        """Populates list of themes"""
+        self.theme_combo.blockSignals(True)
+        themes.sort()
+        self.theme_combo.clear()
+        self.theme_combo.addItems(themes)
+        self.theme_combo.setCurrentText(config_data.get("theme", ""))
+        self.theme_combo.blockSignals(False)
 
     def _emit_settings(self):
         """Emits checkbox states and text edit text"""
@@ -387,7 +406,7 @@ class OptionsTab(QWidget):
 
         # Bottom buttons
         btn_start = QPushButton("Start")
-        btn_start.setStyleSheet("background-color: green")
+        btn_start.setObjectName("btn_start")
         btn_start.clicked.connect(self.start_requested.emit)
 
         btn_save_main = QPushButton("Save")
@@ -493,7 +512,6 @@ class OptionsTab(QWidget):
         self.time_limit_edit.setTime(QTime(0, 0).addSecs(secs))
         self.time_limit_edit.setEnabled(game_rules["time_limit"]["enabled"])
 
-        # Generic setter for track rules
         for key, config in track_rules.items():
             chk = self.widgets.get(f"{key}_chk")
             wdg = self.widgets.get(f"{key}_wdg")
@@ -549,6 +567,9 @@ class GameTab(QWidget):
         layout = QVBoxLayout()
 
         self.track_lbl = QLabel()
+        self.track_lbl.setStyleSheet(
+            'font-family: "Consolas", "Cascadia Code", "SF Mono", monospace;'
+        )
         self.track_bar = QProgressBar()
         frame = QFrame()
         l1 = QHBoxLayout(frame)
@@ -556,6 +577,9 @@ class GameTab(QWidget):
         l1.addWidget(self.track_bar)
 
         self.time_lbl = QLabel()
+        self.time_lbl.setStyleSheet(
+            'font-family: "Consolas", "Cascadia Code", "SF Mono", monospace;'
+        )
         self.time_bar = QProgressBar()
         self.time_frame = QFrame()
         l2 = QHBoxLayout(self.time_frame)
@@ -567,14 +591,17 @@ class GameTab(QWidget):
 
         btn_layout = QHBoxLayout()
         btn_rel = QPushButton("Reload")
-        btn_rel.setStyleSheet("QPushButton {background-color: yellow; color: black;}")
+        btn_rel.setObjectName("btn_reload")
         btn_rel.clicked.connect(self.reload_requested.emit)
+
         btn_skip = QPushButton("Skip")
-        btn_skip.setStyleSheet("QPushButton {background-color: orange; color: black;}")
+        btn_skip.setObjectName("btn_skip")
         btn_skip.clicked.connect(self.skip_requested.emit)
+
         btn_stop = QPushButton("Stop")
-        btn_stop.setStyleSheet("QPushButton {background-color: red; color: black;}")
+        btn_stop.setObjectName("btn_stop")
         btn_stop.clicked.connect(self.stop_requested.emit)
+
         btn_layout.addWidget(btn_rel)
         btn_layout.addWidget(btn_skip)
         btn_layout.addWidget(btn_stop)
@@ -586,7 +613,6 @@ class GameTab(QWidget):
         self.setLayout(layout)
 
     def set_time_visible(self, visible: bool):
-        """Show time progress bar in game screen"""
         self.time_frame.setVisible(visible)
 
     def update_track_progress(self, current: int, total: int):
@@ -609,19 +635,16 @@ class GameTab(QWidget):
 class Dialogs:
     @staticmethod
     def ask_for_exe(parent):
-        path = QFileDialog.getOpenFileName(parent, "Select TmForever.exe")[0]
-        return path
+        return QFileDialog.getOpenFileName(parent, "Select TmForever.exe")[0]
 
     @staticmethod
     def ask_for_track_dir(parent):
-        path = QFileDialog.getExistingDirectory(parent, "Select Tracks Folder")
-        return path
+        return QFileDialog.getExistingDirectory(parent, "Select Tracks Folder")
 
     @staticmethod
     def question(parent, title, question):
         reply = QMessageBox.question(parent, title, question)
-        if reply == QMessageBox.StandardButton.Yes:
-            return True
+        return reply == QMessageBox.StandardButton.Yes
 
     @staticmethod
     def new_preset_name(parent, preset_names: list):
@@ -640,16 +663,11 @@ class Dialogs:
                 )
                 continue
 
-            if preset_name in [
-                "Load",
-                "Save",
-                "New...",
-                "Delete",
-            ]:
+            if preset_name in ["Load", "Save", "New...", "Delete"]:
                 QMessageBox.warning(
                     parent,
                     "Invalid Preset Name",
-                    f"{preset_name} is a invalid preset name.",
+                    f"{preset_name} is an invalid preset name.",
                 )
                 continue
             if preset_name in preset_names:
@@ -675,10 +693,6 @@ class MainWindow(QMainWindow):
         self.stacked = QStackedWidget()
         self.setCentralWidget(self.stacked)
 
-        # NOTE: advanced options tab?
-        # search author/track/trackpack by name
-        # move some other settings here?
-
         self.tabs = QTabWidget()
         self.options_tab = OptionsTab()
         self.banned_tab = BannedTracksTab()
@@ -691,6 +705,11 @@ class MainWindow(QMainWindow):
         self.game_tab = GameTab()
         self.stacked.addWidget(self.game_tab)
 
+        self.window_size = None
+
+    def apply_theme(self, theme):
+        QApplication.instance().setStyleSheet(theme)
+
     def set_status(self, msg, timeout=0):
         self.status.showMessage(msg, timeout)
 
@@ -698,15 +717,27 @@ class MainWindow(QMainWindow):
         QMessageBox.warning(self, title, msg)
 
     def show_game(self, force_window_size=True):
-        """Switch to game screen"""
         self.stacked.setCurrentIndex(1)
+        game_min = self.game_tab.minimumSizeHint()
         if force_window_size:
-            self.setMinimumHeight(220)
-            self.setMaximumHeight(220)
+            self.setMinimumHeight(int(game_min.height() * 1.15))
+            self.setMaximumHeight(int(game_min.height() * 1.15))
+        else:
+            self.setMinimumHeight(game_min.height())
+            self.setMaximumHeight(16777215)
 
     def show_config(self, force_window_size=True):
-        """Switch to config screen"""
         self.stacked.setCurrentIndex(0)
         if force_window_size:
+            self.set_window_size()
+        else:
+            self.setMinimumSize(self.game_tab.minimumSizeHint())
+            self.setMaximumSize(16777215, 16777215)
+
+    def set_window_size(self):
+        if self.window_size:
+            self.setMinimumSize(self.window_size)
+            self.setMaximumSize(self.window_size)
+        else:
             self.setMinimumSize(self.minimumSizeHint())
             self.setMaximumSize(self.minimumSizeHint())
