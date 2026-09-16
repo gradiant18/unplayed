@@ -35,6 +35,7 @@ class AppPresenter:
 
         self.connect_signals()
         self.refresh_ui_from_model()
+        self.view.window_size = self.view.minimumSizeHint()
 
         if "default_data" in self.model.config.keys():
             del self.model.config["default_data"]
@@ -67,9 +68,6 @@ class AppPresenter:
         self.view.game_tab.stop_requested.connect(lambda: self.session.stop())
 
     def refresh_ui_from_model(self):
-        if self.model.config["force_window_size"]:
-            self.view.setMinimumSize(473, 529)
-            self.view.setMaximumSize(473, 529)
         self.view.settings_tab.populate(self.model.config)
         self.view.settings_tab.populate_themes(
             self.model.get_themes(), self.model.config
@@ -79,13 +77,15 @@ class AppPresenter:
             theme = "Default"
         self.view.apply_theme(self.model.load_theme(theme))
         self.view.banned_tab.populate(self.model.data)
-
         self.view.options_tab.populate_presets(self.model.get_presets())
 
         game_rules = self.model.config["game_rules"]
         track_rules = self.model.config["track_rules"]
         self.view.options_tab.update_comboboxes(game_rules["site"])
         self.view.options_tab.populate_rules(game_rules, track_rules)
+
+        if self.model.config["force_window_size"]:
+            self.view.set_window_size()
 
     def save_model(self, silent=False):
         if not silent:
@@ -100,16 +100,13 @@ class AppPresenter:
         old = self.model.config["force_window_size"]
         self.model.config.update(new_settings)
         if self.model.config["force_window_size"] != old:
+            self.view.hide()
             if self.model.config["force_window_size"]:
-                self.view.setMinimumSize(473, 529)
-                self.view.setMaximumSize(473, 529)
-                self.view.hide()
-                self.view.show()
+                self.view.set_window_size()
             else:
                 self.view.setMinimumSize(0, 0)
                 self.view.setMaximumSize(16777215, 16777215)
-                self.view.hide()
-                self.view.show()
+            self.view.show()
 
     def handle_find_exe(self):
         steam = os.path.join("Steam", "steamapps", "common")
@@ -250,6 +247,7 @@ class AppPresenter:
         theme = self.model.load_theme(name)
         if theme:
             self.view.apply_theme(theme)
+            self.view.set_window_size()
         self.model.config["theme"] = name
 
     def handle_banned_clear(self):

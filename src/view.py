@@ -705,6 +705,8 @@ class MainWindow(QMainWindow):
         self.game_tab = GameTab()
         self.stacked.addWidget(self.game_tab)
 
+        self.window_size = None
+
     def apply_theme(self, theme):
         QApplication.instance().setStyleSheet(theme)
 
@@ -723,5 +725,12 @@ class MainWindow(QMainWindow):
     def show_config(self, force_window_size=True):
         self.stacked.setCurrentIndex(0)
         if force_window_size:
-            self.setMinimumSize(473, 529)
-            self.setMaximumSize(473, 529)
+            self.set_window_size()
+
+    def set_window_size(self):
+        if self.window_size:
+            self.setMinimumSize(self.window_size)
+            self.setMaximumSize(self.window_size)
+        else:
+            self.setMinimumSize(self.minimumSizeHint())
+            self.setMaximumSize(self.minimumSizeHint())
